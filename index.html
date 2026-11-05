@@ -1,0 +1,1397 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>롤투롤 장력 시뮬레이터</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --text:#1d2330; --text2:#5b6474; --text3:#8a93a3; --border:#dde1e8; --accent:#3557d6; --accent-soft:#e8edfc;
+  --ok:#1f9d55; --warn:#d48806; --bad:#d64545; --grid:#e9ecf1; --unw:#2f6fde; --wnd:#e07b1a; --ref:#7d8696; --est:#8e44ad;
+  --m-spd:#2f6fde; --m-trq:#8e44ad; --m-nosens:#119c8c; --m-full:#e0452f; --m-dancer:#b07d12; --m-dancerT:#c2185b; --epc:#119c8c;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#14171d; --panel:#1c2028; --text:#e6e9ef; --text2:#a8b0bd; --text3:#788191; --border:#2e3440; --accent:#7b96ff; --accent-soft:#252d45;
+  --grid:#262b35; --unw:#5b92ff; --wnd:#ff9a40; --ref:#9aa3b2; --est:#c07ae0; --m-spd:#5b92ff; --m-trq:#c07ae0; --m-nosens:#2cc7b4; --m-full:#ff6a52; --m-dancer:#e0b040; --m-dancerT:#ff5c9a; --epc:#2cc7b4;
+  color-scheme: dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#14171d; --panel:#1c2028; --text:#e6e9ef; --text2:#a8b0bd; --text3:#788191; --border:#2e3440; --accent:#7b96ff; --accent-soft:#252d45;
+  --grid:#262b35; --unw:#5b92ff; --wnd:#ff9a40; --ref:#9aa3b2; --est:#c07ae0; --m-spd:#5b92ff; --m-trq:#c07ae0; --m-nosens:#2cc7b4; --m-full:#ff6a52; --m-dancer:#e0b040; --m-dancerT:#ff5c9a; --epc:#2cc7b4;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--panel);border-bottom:1px solid var(--border)}
+header h1{font-size:18px;margin:0}
+header .sub{color:var(--text2);font-size:13px}
+.wrap{display:grid;grid-template-columns:300px 1fr;gap:14px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1700px;margin:0 auto}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.card h2{font-size:13px;margin:0 0 8px;color:var(--text2);font-weight:700}
+label.f{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:5px 0;font-size:13px}
+label.f span{color:var(--text2)}
+label.f input,label.f select{width:140px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font:inherit}
+label.f input[type=number]{text-align:right}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+button{font:inherit;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:7px;padding:6px 10px;cursor:pointer}
+button:hover{background:var(--accent-soft)}
+button.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+button.pri:hover{filter:brightness(1.08)}
+button.danger{border-color:var(--bad);color:var(--bad)}
+.side{display:flex;flex-direction:column;gap:12px}
+.main{display:flex;flex-direction:column;gap:12px;min-width:0}
+canvas{display:block;width:100%}
+#machine{height:270px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{background:var(--bg);border-radius:8px;padding:6px 10px}
+.stat .k{font-size:11.5px;color:var(--text2)}
+.stat .v{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat .v small{font-size:12px;font-weight:500;color:var(--text2)}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chart{height:200px}
+.formula{font-size:13px;color:var(--text);background:var(--bg);border-radius:8px;padding:8px 10px;margin-top:6px;white-space:pre-line}
+.alarms{font-size:12.5px;max-height:90px;overflow:auto;color:var(--bad);margin:0;padding-left:18px}
+.alarms:empty::before{content:'알람 없음';color:var(--text3);margin-left:-18px}
+table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+th,td{padding:5px 6px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
+th{color:var(--text2);font-weight:600;background:var(--bg)}
+th:nth-child(-n+4),td:nth-child(-n+4){text-align:left}
+.g-우수{color:var(--ok);font-weight:700}.g-보통{color:var(--warn);font-weight:700}.g-나쁨{color:var(--bad);font-weight:700}
+.state{margin-left:auto;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--bg)}
+.state.run{color:var(--ok)}.state.alarm{color:#fff;background:var(--bad)}
+.hint{font-size:12px;color:var(--text3);margin-top:6px}
+details summary{cursor:pointer;color:var(--text2);font-weight:700;font-size:13px}
+details p,details li{font-size:13px;color:var(--text)}
+.tscroll{overflow-x:auto;max-width:100%}
+#zone-card table{table-layout:fixed;min-width:720px}
+#zone-card th:nth-child(1){width:120px}#zone-card th:nth-child(3){width:100px}#zone-card th:nth-child(4){width:240px}
+#zone-card th:nth-child(5){width:96px}#zone-card th:nth-child(6),#zone-card th:nth-child(7){width:84px;text-align:right}
+#zone-card td:nth-child(6),#zone-card td:nth-child(7){text-align:right}
+#zone-card td{overflow:hidden;text-overflow:ellipsis}
+#zone-card select{max-width:100%}
+.side,.main,.card{min-width:0}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text2);margin-top:4px}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:4px}
+@media (max-width:1100px){.wrap{grid-template-columns:1fr}.charts{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>롤투롤 장력 시뮬레이터</h1>
+  <span class="sub">권출 → 메인 롤 → 권취 · 2차 전지 전극/분리막 · 3차 (여러 롤 · 구간별 장력)</span>
+  <span class="state" id="st-state">정지</span>
+</header>
+
+<div class="wrap">
+  <div class="side">
+    <div class="card">
+      <h2>필름 · 장비</h2>
+      <label class="f"><span>라인</span><select id="c-preset"><option value="basic">기본 (권출-메인-권취)</option><option value="coater">코터 (구동 롤 3 + 건조로)</option><option value="press">롤 프레스 (구동 롤 3)</option></select></label>
+      <label class="f"><span>필름</span><select id="c-mat"></select></label>
+      <label class="f"><span>폭 (mm)</span><input id="c-width" type="number" value="300" step="10"></label>
+      <label class="f"><span>목표 장력 (N)</span><input id="c-T0" type="number" step="1"></label>
+      <label class="f"><span>권취 테이퍼 (%)</span><input id="c-taper" type="number" value="0" step="5" min="0" max="60"></label>
+      <label class="f"><span>라인 속도 (m/min)</span><input id="c-v" type="number" value="60" step="5"></label>
+      <label class="f"><span>가감속 시간 (초)</span><input id="c-tacc" type="number" value="5" step="0.5" min="0.5"></label>
+      <label class="f"><span>권출 시작 지름 (mm)</span><input id="c-D1" type="number" value="300" step="10" max="320"></label>
+      <label class="f"><span>권취 시작 지름 (mm)</span><input id="c-D3" type="number" value="80" step="5" min="77"></label>
+    </div>
+    <div class="card">
+      <h2>제어</h2>
+      <label class="f"><span>제어 방식</span><select id="c-method"></select></label>
+      <label class="f"><span>지름 계산</span><select id="c-dia"><option value="thick">두께 누적식</option><option value="ratio">회전비식</option></select></label>
+      <label class="f"><span id="l-kp">P</span><input id="c-kp" type="number" step="any"></label>
+      <label class="f"><span id="l-ki">I</span><input id="c-ki" type="number" step="any"></label>
+      <div class="btns"><button id="b-rec">게인 추천값</button></div>
+      <div class="formula" id="formula"></div>
+    </div>
+    <div class="card">
+      <h2>메인 롤 · EPC</h2>
+      <label class="f"><span>메인 롤 종류</span><select id="c-main"><option value="nip">구동 롤 + 닙 롤</option><option value="press">롤 프레스 (상·하 2모터)</option></select></label>
+      <label class="f"><span>필름 감김각 (°)</span><input id="c-wrap" type="number" value="180" step="10" min="0" max="270"></label>
+      <label class="f"><span>마찰계수 μ</span><input id="c-mu" type="number" value="0.2" step="0.05" min="0"></label>
+      <label class="f"><span>닙 가압 (N)</span><input id="c-nip" type="number" value="100" step="10" min="0"></label>
+      <label class="f"><span>롤 프레스 드룹</span><input id="c-droop" type="checkbox" checked style="width:auto"></label>
+      <label class="f"><span>하 롤 지름 오차 (%)</span><input id="c-mis" type="number" value="0" step="0.1" min="0"></label>
+      <label class="f"><span>압연 연신율 (%)</span><input id="c-elong" type="number" value="0.3" step="0.1" min="0"></label>
+      <label class="f"><span>EPC 사행 보정</span><input id="c-epc" type="checkbox" checked style="width:auto"></label>
+      <label class="f"><span>EPC 게인</span><input id="c-epcg" type="number" value="0.5" step="0.1" min="0"></label>
+      <label class="f"><span>사행 흐름 크기 (mm)</span><input id="c-drift" type="number" value="2" step="0.5" min="0"></label>
+      <div class="hint">미끄럼: 메인 롤이 잡는 힘 = 낮은 쪽 장력 × (e<sup>μθ</sup> − 1) + 2 × μ × 닙 가압. 앞뒤 장력 차이가 이보다 크면 필름이 미끄러집니다.</div>
+    </div>
+    <div class="card">
+      <h2>운전</h2>
+      <div class="btns">
+        <button class="pri" id="b-start">▶ 기동</button>
+        <button id="b-stop">■ 정지</button>
+        <button class="danger" id="b-estop">비상 정지</button>
+        <button id="b-break">필름 끊기</button>
+        <button id="b-reset">처음으로</button>
+      </div>
+      <label class="f" style="margin-top:10px"><span>시나리오</span><select id="c-scen"></select></label>
+      <div class="btns">
+        <button class="pri" id="b-scen">시나리오 실행</button>
+        <button id="b-cmp">6방식 비교</button>
+        <button id="b-roles">중간 롤 역할 비교</button>
+      </div>
+      <label class="f" style="margin-top:10px"><span>지름 변화 배속</span><select id="c-dacc"><option value="1">×1 (실제)</option><option value="20">×20</option><option value="100">×100</option><option value="300" selected>×300</option><option value="600">×600</option></select></label>
+      <label class="f"><span>화면 속도</span><select id="c-speed"><option value="0.25">×0.25 (느리게)</option><option value="0.5">×0.5</option><option value="1" selected>×1</option><option value="3">×3</option></select></label>
+      <div class="hint">지름 변화 배속: 실제로는 롤 하나 감는 데 몇 시간 걸리므로, 짧은 시간에 지름 변화를 보려고 두께만 키워 계산합니다. 설정을 바꾸면 처음 상태로 돌아갑니다.</div>
+    </div>
+    <div class="card">
+      <h2>알람 기록</h2>
+      <ol class="alarms" id="alarms"></ol>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="card">
+      <canvas id="machine"></canvas>
+      <div class="stats">
+        <div class="stat"><div class="k">라인 속도</div><div class="v" id="s-v">0</div></div>
+        <div class="stat"><div class="k">권출 장력 / 목표</div><div class="v" id="s-T1">0</div></div>
+        <div class="stat"><div class="k">권취 장력 / 목표</div><div class="v" id="s-T2">0</div></div>
+        <div class="stat"><div class="k">감은 길이</div><div class="v" id="s-len">0</div></div>
+        <div class="stat"><div class="k">권출 지름 실제 / 계산</div><div class="v" id="s-D1">0</div></div>
+        <div class="stat"><div class="k">권취 지름 실제 / 계산</div><div class="v" id="s-D3">0</div></div>
+        <div class="stat"><div class="k">권출 토크 (모드)</div><div class="v" id="s-q1">0</div></div>
+        <div class="stat"><div class="k">권취 토크 (모드)</div><div class="v" id="s-q3">0</div></div>
+        <div class="stat"><div class="k">사행 (엣지 센서) / EPC 위치</div><div class="v" id="s-epc">0</div></div>
+        <div class="stat"><div class="k">댄서 위치 권출 / 권취</div><div class="v" id="s-dan">-</div></div>
+        <div class="stat"><div class="k">메인 롤 잡는 힘 여유</div><div class="v" id="s-slip">-</div></div>
+        <div class="stat"><div class="k">롤 프레스 토크 상 / 하</div><div class="v" id="s-press">-</div></div>
+      </div>
+    </div>
+
+    <div class="card" id="zone-card">
+      <h2>장력 구간 <span style="font-weight:400;color:var(--text3)">— 구동 롤 사이마다 구간이 나뉘고, 기준 롤(속도 기준)이 아닌 쪽 끝 축이 그 구간 장력을 맡습니다. 목표·역할을 바꾸면 처음 상태로 돌아갑니다.</span></h2>
+      <div class="tscroll"><table><thead><tr><th>구간</th><th>범위</th><th>맡는 축</th><th>제어</th><th>목표 장력</th><th>실제</th><th>오차</th></tr></thead><tbody id="zone-body"></tbody></table></div>
+    </div>
+
+    <div class="charts">
+      <div class="card"><h2>① 장력 (N)</h2><canvas class="chart" id="ch-T"></canvas>
+        <div class="legend" id="lg-T"><span><i style="background:var(--unw)"></i>권출 스팬</span><span><i style="background:var(--wnd)"></i>권취 스팬</span><span><i style="background:var(--ref)"></i>목표</span></div></div>
+      <div class="card"><h2>② 속도 (m/min)</h2><canvas class="chart" id="ch-V"></canvas>
+        <div class="legend"><span><i style="background:var(--ref)"></i>라인 지령</span><span><i style="background:var(--unw)"></i>권출 표면</span><span><i style="background:var(--wnd)"></i>권취 표면</span></div></div>
+      <div class="card"><h2>③ 롤 지름 (mm)</h2><canvas class="chart" id="ch-D"></canvas>
+        <div class="legend"><span><i style="background:var(--unw)"></i>권출 실제</span><span><i style="background:var(--wnd)"></i>권취 실제</span><span><i style="background:var(--est)"></i>PLC 계산값 (점선)</span></div></div>
+      <div class="card"><h2>④ 모터 토크 (N·m, 롤 축)</h2><canvas class="chart" id="ch-Q"></canvas>
+        <div class="legend"><span><i style="background:var(--unw)"></i>권출 (−는 브레이크)</span><span><i style="background:var(--wnd)"></i>권취</span></div></div>
+      <div class="card"><h2>⑤ 사행 · EPC (mm)</h2><canvas class="chart" id="ch-E"></canvas>
+        <div class="legend"><span><i style="background:var(--bad)"></i>필름 가장자리 (엣지 센서)</span><span><i style="background:var(--epc)"></i>EPC 스탠드 위치</span></div></div>
+      <div class="card" id="card-dn"><h2>⑥ 댄서 위치 (mm, +는 아래)</h2><canvas class="chart" id="ch-Dn"></canvas>
+        <div class="legend"><span><i style="background:var(--unw)"></i>권출 댄서</span><span><i style="background:var(--wnd)"></i>권취 댄서</span></div></div>
+      <div class="card" id="card-s"><h2>⑥ 메인 롤 잡는 힘 여유 (N) — 0 아래로 가면 미끄럼</h2><canvas class="chart" id="ch-S"></canvas>
+        <div class="legend"><span><i style="background:var(--ok)"></i>여유 = 잡는 힘 − 앞뒤 장력 차이</span></div></div>
+      <div class="card" id="card-p"><h2>⑦ 롤 프레스 토크 (N·m)</h2><canvas class="chart" id="ch-P"></canvas>
+        <div class="legend"><span><i style="background:var(--unw)"></i>상 롤</span><span><i style="background:var(--wnd)"></i>하 롤</span></div></div>
+    </div>
+
+    <div class="card">
+      <h2>결과 비교 <span style="font-weight:400;color:var(--text3)">— 시나리오 실행·6방식 비교 결과가 쌓입니다. 판정: 최대 오차가 목표의 5% 이하 우수, 12% 이하 보통</span></h2>
+      <div id="cmp-wrap" style="display:none">
+        <div class="charts" style="margin-bottom:10px">
+          <div><canvas class="chart" id="ch-c1"></canvas><div class="legend" id="lg-c1"></div></div>
+          <div><canvas class="chart" id="ch-c2"></canvas><div class="legend" id="lg-c2"></div></div>
+        </div>
+      </div>
+      <div class="tscroll"><table>
+        <thead><tr><th>#</th><th>필름</th><th>시나리오</th><th>제어 방식</th><th>가감속 최대 오차</th><th>정속 최대 오차</th><th>평균 오차(RMS)</th><th>사행 최대</th><th>알람 · 비고</th><th>판정</th></tr></thead>
+        <tbody id="results"></tbody>
+      </table></div>
+      <div class="btns"><button id="b-clear">표 지우기</button></div>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>계산 모델 설명 (PLC 로 옮길 때 참고)</summary>
+        <ul>
+          <li><b>필름 스팬</b>: 길이 L 사이 장력 변화 L·dT/dt = EA·(v<sub>뒤</sub> − v<sub>앞</sub>) + T<sub>앞</sub>·v<sub>앞</sub> − T·v<sub>뒤</sub>. E = 영률, A = 두께×폭. 동박 8µm·300mm 면 EA ≈ 264kN → 속도가 1% 어긋나면 장력이 약 2,600N 바뀜 (그래서 딱딱한 포일은 속도 제어가 어렵다).</li>
+          <li><b>롤</b>: J(D)·dω/dt = 토크 ± 장력×반지름 − 마찰. J 는 지름의 4제곱에 비례 (동박 300mm 롤 ≈ 176kg, J ≈ 2.1kg·m²).</li>
+          <li><b>지름</b>: 실제 지름은 한 바퀴마다 두께만큼 변함. PLC 계산값은 두께 누적식(시작 지름 입력 + 엔코더 회전수 × 두께) 또는 회전비식(라인 속도 ÷ 롤 회전 속도).</li>
+          <li><b>서보</b>: 속도 모드 = 앰프 속도 루프(20Hz), 토크 모드 = 토크 지령 + 속도 제한(라인 속도의 110%). 토크 한계 40N·m.</li>
+          <li><b>PLC</b>: 2ms 주기로 S자 라인 속도 생성, 지름 계산, 장력 PID, 토크 계산, 인터락(장력 30% 미만 50ms → 비상 정지·릴 속도 제어 전환, 200% 초과 → 비상 정지, 권출 롤 소진).</li>
+          <li><b>장력계</b>: 잡음 ±0.2N, 5ms 필터.</li>
+          <li><b>댄서(②⑤)</b>: 에어 실린더가 아래로 누르는 힘 F 로 장력 ≈ F/2. 댄서가 내려가면 스팬이 길어져 필름이 늘어남. 실린더 마찰 4N, 레귤레이터 응답 0.15초, 행정 ±60mm. 릴은 댄서 위치를 0 으로 맞추는 속도 제어(PI).</li>
+          <li><b>메인 롤 미끄럼</b>: 잡는 힘 = min(T앞, T뒤)·(e<sup>μθ</sup>−1) + 2·μ·닙 가압 (캡스턴 식). 넘치면 필름이 롤 위에서 미끄러지고 라인 속도가 흐트러짐.</li>
+          <li><b>EPC</b>: 권출 스탠드를 옆으로 움직이는 방식. 엣지 센서는 권출에서 0.3m 뒤. 필름 가장자리는 스탠드 위치를 시간상수 (0.3m ÷ 라인 속도)로 따라감 → <b>멈춰 있으면 보정이 안 됨</b>. 흔들림: 롤 한 바퀴 주기 0.3mm + 20초 주기 흐름 + 이음매 어긋남.</li>
+          <li><b>롤 프레스</b>: 상·하 롤이 필름을 물고 있어 한 몸처럼 돌아감. 지름이 조금만 달라도 두 속도 제어가 서로 반대로 싸움(한쪽 +, 한쪽 −). 드룹(미쓰비시 드룹 FB 방식) = 상 롤은 라인 속도 그대로 지키고, 하 롤만 (하 토크 − 상 토크) × 5%/정격만큼 속도 지령을 바꿔 부하를 나눔. 토크 값은 50ms 필터 (바로 쓰면 고속에서 발진).</li>
+          <li><b>여러 롤 라인(3차)</b>: 구동 롤 사이마다 장력 구간. 기준 롤(속도 기준) 위쪽 구간은 위쪽 끝 축이, 아래쪽 구간은 아래쪽 끝 축이 맡음. 중간 롤 지령 = 라인 속도 × (1 + 앞뒤 구간 장력 차 ÷ EA) [드로우] + 가속도 × 서보 지연 [피드포워드] ± PI(구간 장력 오차) [장력 루프]. 프레스 뒤 롤은 압연 연신율만큼 더 빠르게. 건조로 아이들 롤은 베어링 마찰만큼 장력을 조금씩 올림.</li>
+        </ul>
+        <p>근거: 미쓰비시 MELSEC iQ-F Roll to Roll Control FB Library (SH-082718) 3장 제어 방식 ①~⑥, 4장 보조 기능. 수치는 일반값이며 실제 장비와 다를 수 있음.</p>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+// 롤투롤 장력 시뮬레이터 — 계산 엔진 v3 (화면과 분리, node 에서도 실행 가능)
+// 라인 = 요소 N개 (권출 릴 · 구동 롤 · 아이들 롤 · 권취 릴), 요소 사이 = 스팬, 구동 요소 사이 = 장력 구간.
+// 2차: 댄서(②⑤), 구동 롤 미끄럼(감김각·마찰·닙 가압), EPC, 롤 프레스 상·하 2모터 드룹.
+// 3차: 구동 롤 여러 개(프리셋: 기본·코터·롤 프레스), 구간별 목표 장력, 중간 롤 역할(드로우 / 장력 루프).
+(function (root) {
+  'use strict';
+
+  const MATERIALS = {
+    cu8:   { name: '동박 Cu 8µm',        E: 110e9, rho: 8960, h: 8e-6,  T0: 40, Tbreak: 300, color: '#c8763a' },
+    al15:  { name: '알루미늄박 Al 15µm', E: 70e9,  rho: 2700, h: 15e-6, T0: 60, Tbreak: 500, color: '#aab3bd' },
+    sep16: { name: '분리막 PE 16µm',      E: 1.0e9, rho: 950,  h: 16e-6, T0: 12, Tbreak: 250, color: '#dfe7f1' }
+  };
+
+  const METHODS = {
+    spd:     { no: '①', name: '장력 센서 + 속도 제어' },
+    dancer:  { no: '②', name: '댄서 + 속도 제어' },
+    trq:     { no: '③', name: '장력 센서 + 토크 제어' },
+    nosens:  { no: '④', name: '센서 없는 토크 제어' },
+    dancerT: { no: '⑤', name: '댄서 + 속도 + 장력 센서' },
+    full:    { no: '⑥', name: '토크 + 센서 + 관성 보상' }
+  };
+  const isDancer = (m) => m === 'dancer' || m === 'dancerT';
+
+  // 라인 프리셋. k: unw(권출 릴) · drive(구동 롤) · idler(아이들 롤) · wnd(권취 릴)
+  //   drive.role: master(라인 속도 기준) · tension(장력 루프) · draw(드로우=속도 비율만)
+  //   spans: 요소 사이 거리 m, zf: 구간 목표 장력 = 기준 장력 × zf
+  const idlers = (n, name) => Array.from({ length: n }, (_, i) => ({ k: 'idler', name: `${name} ${i + 1}`, R: 0.04, J: 0.002 }));
+  const PRESETS = {
+    basic: {
+      name: '기본: 권출 → 메인 롤 → 권취',
+      els: [{ k: 'unw', name: '권출' }, { k: 'drive', name: '메인 롤', role: 'master', type: 'main', R: 0.05 }, { k: 'wnd', name: '권취' }],
+      spans: [1.5, 1.5], zf: [1, 1], zones: ['권출 구간', '권취 구간']
+    },
+    coater: {
+      name: '코터: 권출 → 인피드 → 코팅 → 건조로 → 아웃피드 → 권취',
+      els: [{ k: 'unw', name: '권출' },
+        { k: 'drive', name: '인피드 닙', role: 'tension', type: 'nip', R: 0.05 },
+        { k: 'drive', name: '코팅 백업 롤', role: 'master', type: 'backup', R: 0.1 },
+        ...idlers(8, '건조로 롤'),
+        { k: 'drive', name: '아웃피드 닙', role: 'tension', type: 'nip', R: 0.05 },
+        { k: 'wnd', name: '권취' }],
+      spans: [1.5, 1.0, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.5], zf: [1, 1.25, 1.0, 0.9],
+      zones: ['권출 구간', '코팅 구간', '건조 구간', '권취 구간']
+    },
+    press: {
+      name: '롤 프레스: 권출 → 인피드 → 프레스 → 아웃피드 → 권취',
+      els: [{ k: 'unw', name: '권출' },
+        { k: 'drive', name: '인피드 닙', role: 'tension', type: 'nip', R: 0.05 },
+        { k: 'drive', name: '롤 프레스', role: 'master', type: 'press', R: 0.2 },
+        { k: 'drive', name: '아웃피드 닙', role: 'tension', type: 'nip', R: 0.05 },
+        { k: 'wnd', name: '권취' }],
+      spans: [1.5, 1.0, 1.0, 1.5], zf: [1, 1.5, 1.25, 0.9],
+      zones: ['권출 구간', '프레스 입구', '프레스 출구', '권취 구간']
+    }
+  };
+
+  const DEF = {
+    span: 1.5, Rc: 0.0381, Jcore: 0.02, b0: 0.02, tc0: 0.3, tauMax: 40, cw: 1500, noise: 0.2, tf: 0.005,
+    plcTs: 0.002, dt: 1e-4, wc: 2 * Math.PI * 20, mainTau: 0.02, estopTime: 1.0,
+    dLoop: 0.15, dMass: 3, dDamp: 30, dStick: 4, dStroke: 0.06, dReg: 0.15, dancerGains: { kp: 4, ki: 2 },
+    webMass: 0.5,
+    pR: 0.2, pJ: 3, pTauMax: 100, pTauRated: 50, pRoll: 20, pDroop: 0.05,
+    latL: 0.3, epcStroke: 50, epcVmax: 20,
+    idB: 0.001, idC: 0.02          // 아이들 롤 베어링 마찰 (점성 N·m·s/rad, 쿨롱 N·m)
+  };
+
+  const clamp = (x, lo, hi) => (x < lo ? lo : x > hi ? hi : x);
+
+  function recommendGains(method, matKey, width) {
+    const m = MATERIALS[matKey];
+    const EA = m.E * m.h * width;
+    if (method === 'spd') { const G = EA / DEF.span, w = 15; const kp = w / G; return { kp, ki: kp * w / 4 }; }
+    if (method === 'dancer') return { ...DEF.dancerGains };
+    if (method === 'trq') return { kp: 0.8, ki: 6 };
+    if (method === 'dancerT') return { kp: 0.5, ki: 2 };
+    if (method === 'full') return { kp: 0.4, ki: 3 };
+    return { kp: 0, ki: 0 };
+  }
+
+  /** 프리셋 → 요소·스팬·구간 정보 (화면 그림에도 씀) */
+  function buildLine(c) {
+    const pr = PRESETS[c.preset || 'basic'];
+    const els = pr.els.map((e) => ({ ...e }));
+    els.forEach((e, i) => {
+      if (e.type === 'main') e.type = c.mainType === 'press' ? 'press' : 'nip';
+      if (e.k === 'drive' && c.roles && c.roles[i]) e.role = c.roles[i];
+    });
+    const n = els.length;
+    const driven = els.map((e, i) => (e.k === 'idler' ? -1 : i)).filter((i) => i >= 0);
+    const mi = els.findIndex((e) => e.role === 'master');
+    const zones = [];
+    for (let z = 0; z < driven.length - 1; z++) {
+      const a = driven[z], b = driven[z + 1];
+      const ctrl = b <= mi ? a : b;               // 메인(마스터) 쪽이 아닌 끝 요소가 그 구간을 맡음
+      const sensor = ctrl === a ? a : b - 1;      // 장력계는 맡은 요소 바로 옆 스팬
+      zones.push({ a, b, ctrl, sensor, up: ctrl === a, name: pr.zones[z], zf: pr.zf[z] });
+    }
+    const zoneOfSpan = []; zones.forEach((zn, z) => { for (let j = zn.a; j < zn.b; j++) zoneOfSpan[j] = z; });
+    return { pr, els, n, spans: pr.spans.slice(), driven, mi, zones, zoneOfSpan };
+  }
+
+  function createSim(cfg) {
+    const c = Object.assign({
+      preset: 'basic', taper: 0, diaAccel: 1, frictionMul: 1, presetErr: 0, diaMethod: 'thick', seed: 12345,
+      mainType: 'nip', wrapDeg: 180, mu: 0.2, nip: 100, droop: true, pressMis: 0, elong: 0.003,
+      epc: true, epcGain: 0.5, drift: 2, zoneT: null, roles: null, tol: null
+    }, cfg);
+    const P = DEF;
+    const mat = MATERIALS[c.mat];
+    const width = c.width, rho = mat.rho;
+    const EA = mat.E * mat.h * width;
+    const heff = mat.h * c.diaAccel;
+    const Rfull = 0.16;
+    const g = c.gains || recommendGains(c.method, c.mat, width);
+    const dancerOn = isDancer(c.method);
+    const line = buildLine(c);
+    const { els, n, zones, mi } = line;
+    const S = n - 1, Z = zones.length, zl = Z - 1;
+    const Ls = line.spans;
+    const press = els.some((e) => e.type === 'press');
+    const pi = els.findIndex((e) => e.type === 'press');
+    const Jof = (R) => P.Jcore + 0.5 * rho * Math.PI * width * (Math.pow(R, 4) - Math.pow(P.Rc, 4));
+    const fric = (w, mul) => mul * (P.b0 * w + P.tc0 * Math.tanh(w / 0.05));
+    const gDrive = recommendGains('spd', c.mat, width);   // 중간 롤 장력 루프 게인
+
+    let seed = c.seed >>> 0 || 1;
+    const rnd = () => { seed = (Math.imul(seed, 1103515245) + 12345) >>> 0; return (seed >>> 1) / 0x7fffffff; };
+    const gauss = () => { const u = rnd() || 1e-9, v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+
+    const zT = zones.map((zn, z) => (c.zoneT && c.zoneT[z] > 0 ? c.zoneT[z] : c.T0 * zn.zf));
+    const T = zones.length ? [] : [];
+    for (let j = 0; j < S; j++) T[j] = zT[line.zoneOfSpan[j]];
+    // 요소 상태
+    const E = els.map((e, i) => ({
+      ...e, i, v: 0, vref: 0, vw: 0, w: 0, stuck: true, Fgrip: 0, margin: 999, slipping: false,
+      tol: (c.tol && c.tol[i]) || 0, pid: { i: 0 }, fricMul: 1
+    }));
+
+    const s = {
+      t: 0, R1: c.D1 / 2, R3: c.D3 / 2, w1: 0, w3: 0, v0: 0, vw: 0, th1: 0, th3: 0,
+      T, Tt: T.slice(), Tm: zT.slice(), Tref: zT.slice(), zOff: zT.map(() => 0),
+      T1m: zT[0], T2m: zT[zl], Tref1: zT[0], Tref3: zT[zl],
+      vcmd: 0, vtgt: 0, acmd: 0, estopping: false, broken: false, fault: null, forceSpeed: false,
+      alarms: [], tau1: 0, tau3: 0, mode1: '', mode3: '',
+      R1e: (c.D1 / 2) * (1 + c.presetErr), R3e: c.D3 / 2,
+      lowCnt: 0, highCnt: 0, tAccEnd: -1e9, wasAcc: false, len: 0,
+      slipping: false, slipCount: 0, slipMargin: 999, lastSlipAlarm: -9,
+      xd1m: 0, xd3m: 0, xd1: 0, vd1: 0, Fp1: 2 * zT[0], Fc1: 2 * zT[0], xd3: 0, vd3: 0, Fp3: 2 * zT[zl], Fc3: 2 * zT[zl],
+      wP: 0, tauU: 0, tauL: 0, refU: 0, refL: 0, tUf: 0, tLf: 0,
+      y: 0, ym: 0, u: 0, dLat: 0, latStep: 0, stepT: -1, stepZone: -1, E
+    };
+    const sv1 = { i: -zT[0] * s.R1 }, sv3 = { i: zT[zl] * s.R3 };
+    const svU = { i: 0 }, svL = { i: 0 };
+    const pid1 = { i: 0 }, pid3 = { i: 0 }, pidD1 = { i: 0 }, pidD3 = { i: 0 };
+    if (c.method === 'trq') { pid1.i = zT[0]; pid3.i = zT[zl]; }
+    let cmd1 = { mode: 'trq', tau: -zT[0] * s.R1, wl: 1, wm: -1 }, cmd3 = { mode: 'trq', tau: zT[zl] * s.R3, wl: 1, wm: -1 };
+    if (dancerOn) { cmd1 = { mode: 'spd', w: 0 }; cmd3 = { mode: 'spd', w: 0 }; }
+    let lastTh1 = 0, lastTh3 = 0, sub = 0;
+    const plcEvery = Math.round(P.plcTs / P.dt);
+    const log = [];
+    let nextLog = 0;
+    const vIn = new Float64Array(n), vOut = new Float64Array(n);
+
+    function alarm(msg) { s.alarms.push({ t: s.t, msg }); }
+    function trip(msg, toSpeed) {
+      if (s.fault) return;
+      s.fault = msg; alarm(msg);
+      s.vtgt = 0; s.estopping = true;
+      if (toSpeed) s.forceSpeed = true;
+    }
+    function pidStep(p, e, lo, hi, gg) {
+      const G = gg || g;
+      p.i = clamp(p.i + G.ki * e * P.plcTs, lo, hi);
+      return clamp(G.kp * e + p.i, lo, hi);
+    }
+    // 구간 z 바로 위쪽(들어오는 쪽) 구간 장력 — 드로우 계산용
+    const zoneBefore = (i) => zones.findIndex((zn) => zn.b === i);
+
+    // ── PLC 한 주기 (2ms) ─────────────────────────────
+    function plc() {
+      const Ts = P.plcTs;
+      const amax = s.estopping ? c.vset / P.estopTime : c.vset / c.tacc;
+      const jerk = amax / (s.estopping ? 0.05 : 0.3 * c.tacc);
+      const dv = s.vtgt - s.vcmd;
+      let ades = Math.sign(dv) * amax;
+      if (Math.sign(s.acmd) === Math.sign(dv) && Math.abs(dv) <= s.acmd * s.acmd / (2 * jerk) + 1e-9) ades = 0;
+      s.acmd += clamp(ades - s.acmd, -jerk * Ts, jerk * Ts);
+      s.vcmd += s.acmd * Ts;
+      if ((s.vtgt - s.vcmd) * dv < 0 || (Math.abs(s.vtgt - s.vcmd) < 1e-4 && Math.abs(s.acmd) < 2 * jerk * Ts)) { s.vcmd = s.vtgt; s.acmd = 0; }
+      if (s.vcmd < 0) { s.vcmd = 0; s.acmd = 0; }
+      const acc = Math.abs(s.acmd) > 1e-9;
+      if (s.wasAcc && !acc) s.tAccEnd = s.t;
+      s.wasAcc = acc;
+      if (s.vcmd === 0 && s.vtgt === 0) s.estopping = false;
+
+      // 지름 계산
+      const d1 = s.th1 - lastTh1, d3 = s.th3 - lastTh3; lastTh1 = s.th1; lastTh3 = s.th3;
+      if (c.diaMethod === 'thick') {
+        s.R1e -= heff * d1 / (2 * Math.PI);
+        s.R3e += heff * d3 / (2 * Math.PI);
+      } else if (s.v0 > 0.05) {
+        const k = Ts / 0.5;
+        if (s.w1 > 0.2) s.R1e += (s.v0 / s.w1 - s.R1e) * k;
+        if (s.w3 > 0.2) s.R3e += (s.v0 / s.w3 - s.R3e) * k;
+      }
+      s.R1e = clamp(s.R1e, P.Rc, 0.2); s.R3e = clamp(s.R3e, P.Rc, 0.2);
+
+      // 구간 목표 장력 (권취 구간 테이퍼)
+      for (let z = 0; z < Z; z++) s.Tref[z] = zT[z] + s.zOff[z];
+      s.Tref[zl] *= (1 - c.taper * clamp((s.R3e - P.Rc) / (Rfull - P.Rc), 0, 1));
+      s.Tref1 = s.Tref[0]; s.Tref3 = s.Tref[zl];
+
+      // 이상 감시 (인터락)
+      const running = s.vcmd > 0.05;
+      if (!s.fault && running) {
+        let lo = 9, hi = 0;
+        for (let z = 0; z < Z; z++) { const r = s.Tm[z] / s.Tref[z]; if (r < lo) lo = r; if (r > hi) hi = r; }
+        s.lowCnt = lo < 0.3 ? s.lowCnt + Ts : 0;
+        if (s.lowCnt > 0.05) trip('장력 저하 (필름 끊김·늘어짐 의심) → 비상 정지, 릴 축 속도 제어로 전환', true);
+        s.highCnt = hi > 2.0 ? s.highCnt + Ts : 0;
+        if (s.highCnt > 0.05) trip('장력 과다 → 비상 정지', false);
+        if (dancerOn && (Math.abs(s.xd1) > 0.95 * P.dStroke || Math.abs(s.xd3) > 0.95 * P.dStroke)) trip('댄서 행정 끝 도달 → 비상 정지', false);
+      }
+      if (!s.fault && s.R1 < P.Rc + 0.003 && running) trip('권출 롤 소진 → 정지', false);
+
+      // 라인 기준 속도: 롤 프레스가 기준이면 프레스 엔코더 실제 속도(드룹으로 조금 느려짐)를 따라감
+      const vl = s.vcmd;   // 상 롤이 라인 속도를 정확히 지키므로 모든 축이 지령 속도를 따름
+      s.aline = (vl - (s.vline || 0)) / Ts;
+      s.vline = vl;
+      // 릴 제어 (권출 = 첫 구간, 권취 = 마지막 구간)
+      const e1 = s.Tref1 - s.T1m, e3 = s.Tref3 - s.T2m;
+      const m = s.forceSpeed ? 'safe' : c.method;
+      s.Fc1 = 2 * s.Tref1; s.Fc3 = 2 * s.Tref3;
+      if (m === 'safe') {
+        cmd1 = { mode: 'spd', w: vl / s.R1e };
+        cmd3 = { mode: 'spd', w: vl / s.R3e };
+      } else if (m === 'spd') {
+        const lim = 0.1 * c.vset + 0.05;
+        const u1 = pidStep(pid1, e1, -lim, lim), u3 = pidStep(pid3, e3, -lim, lim);
+        cmd1 = { mode: 'spd', w: (vl - u1) / s.R1e };
+        cmd3 = { mode: 'spd', w: (vl + u3) / s.R3e };
+      } else if (m === 'dancer' || m === 'dancerT') {
+        const lim = 0.1 * c.vset + 0.05, gd = P.dancerGains;
+        const u1 = pidStep(pidD1, s.xd1m, -lim, lim, gd);
+        const u3 = pidStep(pidD3, s.xd3m, -lim, lim, gd);
+        cmd1 = { mode: 'spd', w: (vl - u1) / s.R1e };
+        cmd3 = { mode: 'spd', w: (vl + u3) / s.R3e };
+        if (m === 'dancerT') {
+          const lim2 = 0.3 * c.T0;
+          s.Fc1 = 2 * (s.Tref1 + pidStep(pid1, e1, -lim2, lim2));
+          s.Fc3 = 2 * (s.Tref3 + pidStep(pid3, e3, -lim2, lim2));
+        }
+      } else {
+        let q1, q3;
+        if (m === 'trq') {
+          const u1 = pidStep(pid1, e1, 0, 3 * s.Tref1), u3 = pidStep(pid3, e3, 0, 3 * s.Tref3);
+          q1 = -s.R1e * u1; q3 = s.R3e * u3;
+        } else {
+          q1 = -s.Tref1 * s.R1e + fric(s.w1, 1);
+          q3 = s.Tref3 * s.R3e + fric(s.w3, 1);
+          if (m === 'full') {
+            q1 += Jof(s.R1e) * s.acmd / s.R1e;
+            q3 += Jof(s.R3e) * s.acmd / s.R3e;
+            const lim = 0.5 * c.T0;
+            q1 -= s.R1e * pidStep(pid1, e1, -lim, lim);
+            q3 += s.R3e * pidStep(pid3, e3, -lim, lim);
+          }
+        }
+        const wl1 = (vl * 1.1 + 0.05) / s.R1e, wl3 = (vl * 1.1 + 0.05) / s.R3e;
+        cmd1 = { mode: 'trq', tau: q1, wl: wl1, wm: -0.05 / s.R1e };
+        cmd3 = { mode: 'trq', tau: q3, wl: wl3, wm: -0.05 / s.R3e };
+      }
+
+      // 구동 롤 속도 지령: 드로우(장력 차이만큼 미리 계산한 속도 비율) + 장력 루프 보정
+      const zm = zoneBefore(mi), Tm0 = zm >= 0 ? s.Tref[zm] : s.Tref[0];
+      for (const d of E) {
+        if (d.k !== 'drive' || d.type === 'press') continue;
+        if (d.i === mi) { d.vref = s.vcmd + (E.length > 3 ? s.aline * P.mainTau : 0); continue; }   // 롤 여러 개면 기준 롤도 같은 피드포워드
+        const zb = zoneBefore(d.i);
+        const Tup = zb >= 0 ? s.Tref[zb] : s.Tref[0];
+        let ratio = 1 + (Tup - Tm0) / EA;
+        if (press && d.i > pi) ratio *= 1 + c.elong;     // 프레스 지나면 필름이 늘어나 빨라짐
+        let v = (vl + s.aline * P.mainTau) * ratio;   // 가속도 피드포워드: 서보 응답 지연만큼 앞서 지령
+        if (d.role === 'tension' && !s.forceSpeed) {
+          const z = zones.findIndex((zn) => zn.ctrl === d.i);
+          const lim = 0.02 * c.vset + 0.02;
+          const u = pidStep(d.pid, s.Tref[z] - s.Tm[z], -lim, lim, gDrive);
+          v += zones[z].up ? -u : u;      // 위쪽 구간을 맡으면 빠를수록 장력↓, 아래쪽이면 장력↑
+        }
+        d.vref = v;
+      }
+
+      // 롤 프레스: 상·하 롤 속도 지령 (드룹)
+      if (press) {
+        const wref = (pi === mi ? s.vcmd : E[pi].vref || s.vcmd) / P.pR;
+        const D = c.droop ? P.pDroop : 0;
+        s.tUf += (s.tauU - s.tUf) * Ts / 0.05;
+        s.tLf += (s.tauL - s.tLf) * Ts / 0.05;
+        // 미쓰비시 드룹 FB 방식: 상 롤 = 라인 속도 그대로, 하 롤 = 토크 차이만큼 속도 지령을 바꿔 부하 분담
+        s.refU = wref;
+        s.refL = wref * (1 - D * (s.tLf - s.tUf) / P.pTauRated);
+      }
+
+      // EPC
+      if (c.epc && !s.broken) {
+        const a = Math.max(0, vIn[1]) / P.latL;
+        const vcmdEpc = clamp(-c.epcGain * a * s.ym, -P.epcVmax, P.epcVmax);
+        s.u = clamp(s.u + vcmdEpc * Ts, -P.epcStroke, P.epcStroke);
+      }
+    }
+
+    function servo(sv, cmd, w, J) {
+      const Kv = P.wc * J, Ki = Kv * P.wc / 4;
+      let tau;
+      if (cmd.mode === 'spd') {
+        const e = cmd.w - w;
+        sv.i = clamp(sv.i + Ki * e * P.dt, -P.tauMax, P.tauMax);
+        tau = Kv * e + sv.i;
+      } else {
+        tau = clamp(cmd.tau, Kv * (cmd.wm - w), Kv * (cmd.wl - w));
+        sv.i = tau;
+      }
+      return clamp(tau, -P.tauMax, P.tauMax);
+    }
+    function pressServo(sv, ref, w, Jeach) {
+      const Kv = P.wc * Jeach, Ki = Kv * P.wc / 4, e = ref - w;
+      sv.i = clamp(sv.i + Ki * e * P.dt, -P.pTauMax, P.pTauMax);
+      return clamp(Kv * e + sv.i, -P.pTauMax, P.pTauMax);
+    }
+    function breakWeb(msg) {
+      if (s.broken) return;
+      s.broken = true; for (let j = 0; j < S; j++) { T[j] = 0; s.Tt[j] = 0; } alarm(msg || '필름 끊김');
+    }
+
+    function substep() {
+      const dt = P.dt;
+      if (sub % plcEvery === 0) plc();
+      sub++;
+      const J1 = Jof(s.R1), J3 = Jof(s.R3);
+      s.tau1 = servo(sv1, cmd1, s.w1, J1);
+      s.tau3 = servo(sv3, cmd3, s.w3, J3);
+      s.mode1 = cmd1.mode; s.mode3 = cmd3.mode;
+      const Tt = s.Tt;
+
+      // 구동 롤
+      let minMargin = 999, anySlip = false;
+      for (const d of E) {
+        if (d.k !== 'drive') continue;
+        const tin = Tt[d.i - 1], tout = Tt[d.i];
+        if (d.type === 'press') {
+          const Rl = P.pR * (1 - c.pressMis), ratio = P.pR / Rl;
+          const Jt = P.pJ + P.pJ * ratio * ratio;
+          s.tauU = pressServo(svU, s.refU, s.wP, Jt / 2);
+          s.tauL = pressServo(svL, s.refL, s.wP * ratio, Jt / 2);
+          const v = s.wP * P.pR;
+          const load = P.pRoll * Math.tanh(v / 0.05) - (tout - tin) * P.pR;
+          s.wP += (s.tauU + s.tauL * ratio - load) / Jt * dt;
+          d.v = d.vw = s.wP * P.pR; d.stuck = true; d.slipping = false;
+          continue;
+        }
+        d.v += (d.vref * (1 + d.tol) - d.v) * dt / P.mainTau;
+        // 미끄럼: 잡는 힘 = 낮은 쪽 장력 × (e^(μθ) − 1) + 2 × μ × 닙 가압
+        const wrap = d.type === 'backup' ? 200 : c.wrapDeg, nip = d.type === 'backup' ? 0 : c.nip;
+        const cap = Math.exp(c.mu * wrap * Math.PI / 180) - 1;
+        const dT = tout - tin;
+        d.Fgrip = Math.max(0, Math.min(tin, tout)) * cap + 2 * c.mu * nip;
+        d.margin = d.Fgrip - Math.abs(dT);
+        if (d.stuck) {
+          d.vw = d.v;
+          if (!s.broken && d.margin < 0) {
+            d.stuck = false; s.slipCount++;
+            if (s.t - s.lastSlipAlarm > 2) alarm(`${d.name} 미끄럼 (잡는 힘 부족)`);
+            s.lastSlipAlarm = s.t;
+          }
+        } else {
+          const rel = d.vw - d.v;
+          const dir = Math.abs(rel) > 1e-6 ? Math.sign(rel) : Math.sign(dT);
+          d.vw += (dT - dir * d.Fgrip) / P.webMass * dt;
+          const rel2 = d.vw - d.v;
+          if ((rel2 * rel <= 0 || Math.abs(rel2) < 1e-5) && d.margin >= 0) { d.stuck = true; d.vw = d.v; }
+        }
+        d.slipping = !d.stuck;
+        if (d.margin < minMargin) minMargin = d.margin;
+        if (d.slipping) anySlip = true;
+      }
+      s.slipMargin = minMargin; s.slipping = anySlip;
+      s.v0 = E[mi].v; s.vw = E[mi].vw;
+
+      // 요소별 들어오는/나가는 필름 속도
+      for (const e of E) {
+        let vi, vo;
+        if (e.k === 'unw') vi = vo = s.w1 * s.R1;
+        else if (e.k === 'wnd') vi = vo = s.w3 * s.R3;
+        else if (e.k === 'idler') vi = vo = e.w * e.R;
+        else { vi = e.vw; vo = e.type === 'press' ? e.vw * (1 + c.elong) : e.vw; }
+        vIn[e.i] = vi; vOut[e.i] = vo;
+      }
+
+      // 댄서 (권출 쪽 = 첫 스팬, 권취 쪽 = 마지막 스팬)
+      if (dancerOn && !s.broken) {
+        s.Fp1 += (s.Fc1 - s.Fp1) * dt / P.dReg;
+        s.Fp3 += (s.Fc3 - s.Fp3) * dt / P.dReg;
+        const dyn = (v, Fp, Tt_) => (Fp - 2 * Tt_ - P.dDamp * v - P.dStick * Math.tanh(v / 0.002)) / P.dMass;
+        s.vd1 += dyn(s.vd1, s.Fp1, Tt[0]) * dt; s.xd1 += s.vd1 * dt;
+        s.vd3 += dyn(s.vd3, s.Fp3, Tt[S - 1]) * dt; s.xd3 += s.vd3 * dt;
+        if (Math.abs(s.xd1) > P.dStroke) { s.xd1 = Math.sign(s.xd1) * P.dStroke; s.vd1 = 0; }
+        if (Math.abs(s.xd3) > P.dStroke) { s.xd3 = Math.sign(s.xd3) * P.dStroke; s.vd3 = 0; }
+      }
+
+      // 스팬 장력
+      if (!s.broken) {
+        for (let j = 0; j < S; j++) {
+          const vd = dancerOn ? (j === 0 ? s.vd1 : j === S - 1 ? s.vd3 : 0) : 0;
+          const xd = dancerOn ? (j === 0 ? s.xd1 : j === S - 1 ? s.xd3 : null) : null;
+          const Lj = xd === null ? Ls[j] : Ls[j] + 2 * (P.dLoop + xd);
+          const gj = vIn[j + 1] - vOut[j] + 2 * vd;
+          const Tprev = j > 0 ? T[j - 1] : 0;
+          T[j] = Math.max(0, T[j] + (EA * gj + Tprev * vOut[j] - T[j] * vIn[j + 1]) / Lj * dt);
+          Tt[j] = T[j] > 0 ? Math.max(0, T[j] + P.cw * gj) : 0;
+          if (Tt[j] > mat.Tbreak) breakWeb('장력 과다로 필름 끊김');
+        }
+      }
+
+      // 릴
+      const dR1 = -heff * s.w1 / (2 * Math.PI), dR3 = heff * s.w3 / (2 * Math.PI);
+      const dJ1 = 2 * Math.PI * rho * width * Math.pow(s.R1, 3) * dR1;
+      const dJ3 = 2 * Math.PI * rho * width * Math.pow(s.R3, 3) * dR3;
+      const a1 = (Tt[0] * s.R1 + s.tau1 - fric(s.w1, c.frictionMul) - s.w1 * dJ1) / J1;
+      const a3 = (s.tau3 - Tt[S - 1] * s.R3 - fric(s.w3, c.frictionMul) - s.w3 * dJ3) / J3;
+      s.w1 += a1 * dt; s.w3 += a3 * dt;
+      s.th1 += s.w1 * dt; s.th3 += s.w3 * dt;
+      s.R1 = Math.max(P.Rc, s.R1 + dR1 * dt);
+      s.R3 = Math.min(0.2, s.R3 + dR3 * dt);
+      // 아이들 롤: 앞뒤 장력 차이로 돌고, 베어링 마찰만큼 뒤쪽 장력이 조금 더 높아짐
+      for (const e of E) {
+        if (e.k !== 'idler') continue;
+        const fr = e.fricMul * (P.idB * e.w + P.idC * Math.tanh(e.w / 0.05));
+        e.w += ((Tt[e.i] - Tt[e.i - 1]) * e.R - fr) / e.J * dt;
+      }
+      s.len += s.vw * dt;
+      const k = dt / P.tf;
+      for (let z = 0; z < Z; z++) s.Tm[z] += (Tt[zones[z].sensor] + P.noise * gauss() - s.Tm[z]) * k;
+      s.T1m = s.Tm[0]; s.T2m = s.Tm[zl];
+
+      // 사행 (EPC): 권출 다음 요소의 필름 속도로 따라감
+      s.dLat = 0.3 * Math.sin(s.th1) + c.drift * Math.sin(2 * Math.PI * s.t / 20) + s.latStep;
+      if (!s.broken) s.y += (Math.max(0, vIn[1]) / P.latL) * (s.u + s.dLat - s.y) * dt;
+      s.ym += (s.y + 0.02 * gauss() - s.ym) * k;
+      const kd = dt / 0.01;
+      s.xd1m += (s.xd1 + 0.00005 * gauss() - s.xd1m) * kd;
+      s.xd3m += (s.xd3 + 0.00005 * gauss() - s.xd3m) * kd;
+
+      s.t += dt;
+      if (s.t >= nextLog) {
+        nextLog += 0.01;
+        log.push({
+          t: s.t, vcmd: s.vcmd, acc: Math.abs(s.acmd) > 1e-9, settle: s.t - s.tAccEnd < 1.0,
+          v0: s.v0, vw: s.vw, v1: s.w1 * s.R1, v3: s.w3 * s.R3,
+          T1m: s.T1m, T2m: s.T2m, Tref1: s.Tref1, Tref3: s.Tref3, Tz: s.Tm.slice(), Trz: s.Tref.slice(),
+          vd: E.filter((e) => e.k === 'drive').map((e) => e.vw),
+          R1: s.R1, R3: s.R3, R1e: s.R1e, R3e: s.R3e, tau1: s.tau1, tau3: s.tau3,
+          xd1: s.xd1, xd3: s.xd3, slip: s.slipping, margin: s.slipMargin,
+          tauU: s.tauU, tauL: s.tauL, y: s.y, u: s.u,
+          fault: !!s.fault, broken: s.broken
+        });
+      }
+    }
+
+    return {
+      cfg: c, s, log, mat, P, EA, Jof, dancerOn, press, line,
+      advance(t) { const k = Math.round(t / P.dt); for (let i = 0; i < k; i++) substep(); },
+      start() { if (!s.fault) { s.vtgt = c.vset; s.estopping = false; } },
+      stop() { s.vtgt = 0; },
+      estop() { s.vtgt = 0; s.estopping = true; alarm('비상 정지 버튼'); },
+      breakWeb() { breakWeb('필름 끊김 (시험)'); },
+      latStep(mm) { s.latStep += mm; alarm(`이음매 사행 ${mm > 0 ? '+' : ''}${mm}mm (시험)`); },
+      zoneStep(z, frac) {
+        z = Math.min(z, Z - 1); const d = zT[z] * frac; s.zOff[z] += d; s.stepT = s.t; s.stepZone = z;
+        alarm(`${zones[z].name} 목표 장력 ${d > 0 ? '+' : ''}${d.toFixed(1)}N 변경 (시험)`);
+      },
+      seizeIdler() {
+        const ids = E.filter((e) => e.k === 'idler'); if (!ids.length) return;
+        const e = ids[Math.floor(ids.length / 2)]; e.fricMul = 15; alarm(`${e.name} 베어링 고착 (시험)`);
+      }
+    };
+  }
+
+  // ── 시나리오 ──────────────────────────────────────
+  // only: 이 프리셋에서만 / multi: 중간 구동 롤이 있는 프리셋에서만
+  const SCENARIOS = {
+    basic:    { name: '기동 → 정속 → 정지' },
+    fast:     { name: '급가속·급감속 (1.5초)' },
+    estop:    { name: '정속 중 비상 정지' },
+    diaerr:   { name: '권출 지름 입력 10% 틀림' },
+    brk:      { name: '정속 중 필름 끊김' },
+    friction: { name: '마찰 3배 (릴 베어링 노후)' },
+    slip:     { name: '닙 롤 열림·감김 90° (미끄럼)' },
+    epc:      { name: '이음매에서 사행 3mm (EPC)' },
+    press:    { name: '롤 프레스 하 롤 지름 0.3% 작음', only: ['basic', 'press'] },
+    zstep:    { name: '두 번째 구간 목표 장력 +25% (구간 간섭)' },
+    wear:     { name: '인피드 롤 지름 0.02% 마모 (드로우 약점)', multi: true },
+    seize:    { name: '건조로 아이들 롤 1개 베어링 고착', only: ['coater'] }
+  };
+
+  function scenarioPlan(key, cfg) {
+    const c = Object.assign({}, cfg);
+    if (key === 'fast') c.tacc = 1.5;
+    if (key === 'diaerr') c.presetErr = 0.10;
+    if (key === 'friction') c.frictionMul = 3;
+    if (key === 'slip') { c.nip = 0; c.wrapDeg = 90; }
+    if (key === 'press') { c.pressMis = 0.003; if ((c.preset || 'basic') === 'basic') c.mainType = 'press'; }
+    if (key === 'wear') { c.tol = Object.assign({}, c.tol, { 1: -0.0002 }); }
+    const ta = c.tacc;
+    let ev, end;
+    if (key === 'estop') { ev = [[0.5, 'start'], [0.5 + ta + 4, 'estop']]; end = 0.5 + ta + 8; }
+    else if (key === 'brk') { ev = [[0.5, 'start'], [0.5 + ta + 4, 'break']]; end = 0.5 + ta + 8; }
+    else if (key === 'epc') { ev = [[0.5, 'start'], [0.5 + ta + 3, 'lat3'], [0.5 + ta + 12, 'stop']]; end = 0.5 + 2 * ta + 15; }
+    else if (key === 'zstep') { ev = [[0.5, 'start'], [0.5 + ta + 3, 'zstep'], [0.5 + ta + 10, 'stop']]; end = 0.5 + 2 * ta + 13; }
+    else if (key === 'seize') { ev = [[0.5, 'start'], [0.5 + ta + 3, 'seize'], [0.5 + ta + 10, 'stop']]; end = 0.5 + 2 * ta + 13; }
+    else { ev = [[0.5, 'start'], [0.5 + ta + 6, 'stop']]; end = 0.5 + 2 * ta + 9; }
+    return { cfg: c, events: ev.map(([t, a]) => ({ t, a })), end };
+  }
+
+  /** info: sim.s (stepT, stepZone) — 목표를 바꾼 구간은 바꾼 뒤 3초 동안 평가에서 빼고, 다른 구간 흔들림 = 간섭 */
+  function metrics(log, cfg, info) {
+    let accMax = 0, stMax = 0, sum = 0, n = 0, epcMax = 0, dMax = 0, imb = 0, slipT = 0, inter = 0;
+    const Z = log.length ? log[0].Tz.length : 2;
+    const zMax = new Array(Z).fill(0);
+    const stepT = info && info.stepT >= 0 ? info.stepT : -1, sz = info ? info.stepZone : -1;
+    for (const r of log) {
+      if (r.fault || r.broken || r.vcmd < 0.05) continue;
+      let d = 0;
+      for (let z = 0; z < Z; z++) {
+        if (stepT >= 0 && z === sz && r.t >= stepT && r.t < stepT + 3) continue;
+        const e = Math.abs(r.Tz[z] - r.Trz[z]);
+        if (e > d) d = e; if (e > zMax[z]) zMax[z] = e;
+        if (stepT >= 0 && z !== sz && r.t >= stepT && r.t < stepT + 5 && e > inter) inter = e;
+      }
+      if (r.acc || r.settle) accMax = Math.max(accMax, d);
+      else if (r.vcmd > 0.95 * cfg.vset) stMax = Math.max(stMax, d);
+      sum += d * d; n++;
+      if (r.vcmd > 0.95 * cfg.vset) epcMax = Math.max(epcMax, Math.abs(r.y));
+      dMax = Math.max(dMax, Math.abs(r.xd1), Math.abs(r.xd3));
+      imb = Math.max(imb, Math.abs(r.tauU - r.tauL));
+      if (r.slip) slipT += 0.01;
+    }
+    const rms = n ? Math.sqrt(sum / n) : 0;
+    const worst = Math.max(accMax, stMax) / cfg.T0 * 100;
+    const grade = worst <= 5 ? '우수' : worst <= 12 ? '보통' : '나쁨';
+    return { accMax, stMax, rms, worstPct: worst, grade, epcMax, dancerMax: dMax * 1000, pressImb: imb, slipT, zMax, inter };
+  }
+
+  function act(sim, a) {
+    if (a === 'start') sim.start(); else if (a === 'stop') sim.stop(); else if (a === 'estop') sim.estop();
+    else if (a === 'break') sim.breakWeb(); else if (a === 'lat3') sim.latStep(3);
+    else if (a === 'zstep') sim.zoneStep(1, 0.25); else if (a === 'seize') sim.seizeIdler();
+  }
+  function runScenario(key, cfg) {
+    const plan = scenarioPlan(key, cfg);
+    const sim = createSim(plan.cfg);
+    let i = 0;
+    while (sim.s.t < plan.end) {
+      while (i < plan.events.length && plan.events[i].t <= sim.s.t) { act(sim, plan.events[i].a); i++; }
+      sim.advance(0.01);
+    }
+    return { sim, plan, m: metrics(sim.log, plan.cfg, sim.s) };
+  }
+
+  const api = { MATERIALS, METHODS, SCENARIOS, PRESETS, DEF, isDancer, recommendGains, buildLine, createSim, scenarioPlan, metrics, runScenario, act };
+  if (typeof module !== 'undefined') module.exports = api; else root.R2R = api;
+})(this);
+
+</script>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const { MATERIALS, METHODS, SCENARIOS, PRESETS, isDancer, recommendGains, createSim, scenarioPlan, metrics, runScenario, act } = R2R;
+
+// ── 선택 목록 채우기 ─────────────────────────────
+for (const [k, m] of Object.entries(MATERIALS)) $('c-mat').add(new Option(m.name, k));
+for (const [k, m] of Object.entries(METHODS)) $('c-method').add(new Option(`${m.no} ${m.name}`, k));
+for (const [k, m] of Object.entries(SCENARIOS)) $('c-scen').add(new Option(m.name, k));
+$('c-method').value = 'full';
+
+const FORMULA = {
+  spd: '롤 회전 지령 = 라인 속도 ÷ 반지름 ± PID(목표 장력 − 실제 장력)\n서보: 속도 모드\n· 부드러운 필름(분리막)에 좋음. 딱딱한 포일은 속도 1% 오차 = 장력 수천 N 이라 게인 조정이 매우 어려움.\n· P 단위: mm/s per N',
+  trq: '토크 = 반지름 × PID(목표 장력 − 실제 장력)\n(적분 시작값 = 목표 장력)\n서보: 토크 모드 + 속도 제한\n· 정속에서 안정, 게인 조정 쉬움. 가감속 때 관성만큼 늦게 따라감.',
+  nosens: '토크 = 목표 장력 × 반지름 + 마찰 보상\n(장력계 값은 쓰지 않음)\n서보: 토크 모드 + 속도 제한\n· 구조가 단순. 지름 계산이 틀리거나 가감속(관성)·마찰 변화가 그대로 장력 오차가 됨.',
+  dancer: '롤 회전 지령 = 라인 속도 ÷ 반지름 ± PI(댄서 위치)\n장력 = 실린더 누르는 힘 ÷ 2 (전공 레귤레이터)\n서보: 속도 모드\n· 댄서가 완충 역할 → 급가감속에 강함. 장력 정밀도는 실린더 마찰에 좌우.\n· P 단위: (mm/s) per mm',
+  dancerT: '② 댄서 + 속도 제어에\n누르는 힘 = 2 × (목표 장력 + PI(장력 오차)) 보정\n서보: 속도 모드\n· 이중 루프: 댄서 위치(속도) + 장력(누르는 힘). 실린더 마찰 오차를 장력 센서로 지움.\n· 아래 P·I 는 장력 보정 게인',
+  full: '토크 = 목표 장력 × 반지름 + 마찰 보상\n      + 관성(J) × 라인 가속도 ÷ 반지름\n      + 반지름 × PID(장력 오차)\n서보: 토크 모드 + 속도 제한\n· 가장 정밀. J 는 지름으로 계산(지름⁴).'
+};
+
+// 방식별 게인 기억
+let gains = {};
+function cfgBase() {
+  return {
+    mat: $('c-mat').value, width: +$('c-width').value / 1000, T0: +$('c-T0').value, taper: +$('c-taper').value / 100,
+    vset: +$('c-v').value / 60, tacc: Math.max(0.5, +$('c-tacc').value), D1: +$('c-D1').value / 1000, D3: Math.max(77, +$('c-D3').value) / 1000,
+    method: $('c-method').value, diaMethod: $('c-dia').value, diaAccel: +$('c-dacc').value,
+    mainType: $('c-main').value, wrapDeg: +$('c-wrap').value, mu: +$('c-mu').value, nip: +$('c-nip').value,
+    droop: $('c-droop').checked, pressMis: +$('c-mis').value / 100,
+    epc: $('c-epc').checked, epcGain: +$('c-epcg').value, drift: +$('c-drift').value,
+    preset: $('c-preset').value, elong: +$('c-elong').value / 100
+  };
+}
+function cfgFull(method) { const c = cfgBase(); if (method) c.method = method; c.gains = toEngine(c.method, gains[c.method]); c.zoneT = zoneT; c.roles = roles; return c; }
+// 화면 단위 ↔ 엔진 단위 (spd 는 mm/s per N 로 보여 줌)
+function toEngine(m, g) { return m === 'spd' ? { kp: g.kp / 1000, ki: g.ki / 1000 } : { ...g }; }
+function fromEngine(m, g) { return m === 'spd' ? { kp: +(g.kp * 1000).toPrecision(3), ki: +(g.ki * 1000).toPrecision(3) } : { ...g }; }
+function recommendAll() {
+  const c = cfgBase();
+  for (const m of Object.keys(METHODS)) gains[m] = fromEngine(m, recommendGains(m, c.mat, c.width));
+}
+function showGains() {
+  const m = $('c-method').value, g = gains[m];
+  const unit = m === 'spd' ? ['P (mm/s per N)', 'I (mm/s per N·s)'] : m === 'dancer' ? ['P (1/s)', 'I (1/s²)'] : m === 'dancerT' ? ['장력 보정 P (배)', '장력 보정 I (1/s)'] : ['P (배)', 'I (1/s)'];
+  $('l-kp').textContent = unit[0]; $('l-ki').textContent = unit[1];
+  $('c-kp').value = g.kp; $('c-ki').value = g.ki;
+  const off = m === 'nosens';
+  $('c-kp').disabled = $('c-ki').disabled = off; $('b-rec').disabled = off;
+  if (off) { $('c-kp').value = ''; $('c-ki').value = ''; }
+  $('formula').textContent = FORMULA[m];
+}
+
+// ── 시뮬레이션 상태 ───────────────────────────────
+let sim, scen = null;
+function reset() {
+  sim = createSim(cfgFull());
+  scen = null;
+  alarmCount = -1;
+  renderAlarms();
+  buildZoneTable();
+}
+$('c-mat').addEventListener('change', () => { $('c-T0').value = MATERIALS[$('c-mat').value].T0; resetZoneOverrides(); recommendAll(); showGains(); reset(); });
+$('c-preset').addEventListener('change', () => { resetZoneOverrides(); filterScenarios(); reset(); });
+$('c-T0').addEventListener('change', resetZoneOverrides);
+$('c-method').addEventListener('change', () => { showGains(); reset(); });
+for (const id of ['c-width', 'c-T0', 'c-taper', 'c-v', 'c-tacc', 'c-D1', 'c-D3', 'c-dia', 'c-dacc', 'c-main', 'c-wrap', 'c-mu', 'c-nip', 'c-droop', 'c-mis', 'c-epc', 'c-epcg', 'c-drift', 'c-elong']) $(id).addEventListener('change', reset);
+for (const id of ['c-kp', 'c-ki']) $(id).addEventListener('change', () => { const m = $('c-method').value; gains[m] = { kp: +$('c-kp').value, ki: +$('c-ki').value }; reset(); });
+$('b-rec').onclick = () => { const c = cfgBase(); gains[c.method] = fromEngine(c.method, recommendGains(c.method, c.mat, c.width)); showGains(); reset(); };
+$('b-start').onclick = () => sim.start();
+$('b-stop').onclick = () => sim.stop();
+$('b-estop').onclick = () => sim.estop();
+$('b-break').onclick = () => sim.breakWeb();
+$('b-reset').onclick = reset;
+$('b-clear').onclick = () => { $('results').innerHTML = ''; rowNo = 0; $('cmp-wrap').style.display = 'none'; };
+
+$('b-scen').onclick = () => {
+  const key = $('c-scen').value, plan = scenarioPlan(key, cfgFull());
+  sim = createSim(plan.cfg);
+  scen = { key, plan, i: 0 };
+  renderAlarms();
+};
+$('b-roles').onclick = compareRoles;
+$('b-cmp').onclick = () => {
+  const key = $('c-scen').value;
+  const runs = Object.keys(METHODS).map((m) => ({ m, r: runScenario(key, cfgFull(m)) }));
+  runs.forEach(({ m, r }) => addRow(r.plan.cfg, key, m, r.m, r.sim.s.alarms));
+  drawCompare(runs);
+};
+
+// ── 결과 표 ───────────────────────────────────────
+let rowNo = 0;
+function addRow(cfg, key, m, mt, alarms, label) {
+  const pct = (x) => `${x.toFixed(2)}N <small>(${(x / cfg.T0 * 100).toFixed(1)}%)</small>`;
+  const al = alarms.filter((a) => !a.msg.includes('버튼') && !a.msg.includes('시험')).map((a) => a.msg.split(' →')[0].split(' (')[0]);
+  if (mt.slipT > 0) al.push(`미끄럼 ${mt.slipT.toFixed(1)}초`);
+  if (isDancer(m)) al.push(`댄서 최대 ${mt.dancerMax.toFixed(1)}mm`);
+  if (mt.zMax && mt.zMax.length > 2) al.push('구간별 ' + mt.zMax.map((x) => x.toFixed(1)).join('/') + 'N');
+  if (mt.inter > 0) al.push(`옆 구간 간섭 ${mt.inter.toFixed(1)}N`);
+  if (cfg.mainType === 'press') al.push(`상·하 토크 차 ${mt.pressImb.toFixed(0)}N·m${cfg.droop ? '' : ' (드룹 끔)'}`);
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${++rowNo}</td><td>${MATERIALS[cfg.mat].name}${cfg.preset && cfg.preset !== 'basic' ? ' · ' + PRESETS[cfg.preset].name.split(':')[0] : ''}</td><td>${SCENARIOS[key].name}</td><td>${METHODS[m].no} ${METHODS[m].name}${label ? '<br><small>' + label + '</small>' : ''}</td>
+    <td>${pct(mt.accMax)}</td><td>${pct(mt.stMax)}</td><td>${mt.rms.toFixed(2)}N</td><td>${mt.epcMax.toFixed(2)}mm${cfg.epc ? '' : ' <small>(EPC 끔)</small>'}</td><td style="text-align:left;color:var(--bad);white-space:normal;min-width:180px">${[...new Set(al)].join(', ')}</td>
+    <td class="g-${mt.grade}">${mt.grade}</td>`;
+  $('results').prepend(tr);
+}
+
+// ── 차트 ──────────────────────────────────────────
+function fitCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); return { g, w, h };
+}
+function drawChart(cv, rows, t0, t1, series, opt = {}) {
+  const { g, w, h } = fitCanvas(cv);
+  g.clearRect(0, 0, w, h);
+  const L = 44, R = 8, T = 8, B = 20, pw = w - L - R, ph = h - T - B;
+  let lo = Infinity, hi = -Infinity;
+  for (const r of rows) for (const s of series) { const y = s.f(r); if (Number.isFinite(y)) { if (y < lo) lo = y; if (y > hi) hi = y; } }
+  if (opt.min !== undefined) lo = Math.min(lo, opt.min);
+  if (opt.max !== undefined) hi = Math.max(hi, opt.max);
+  if (!Number.isFinite(lo)) { lo = 0; hi = 1; }
+  if (hi - lo < (opt.minSpan || 1e-6)) { const m = (hi + lo) / 2, sp = (opt.minSpan || 1) / 2; lo = m - sp; hi = m + sp; }
+  const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+  const X = (t) => L + (t - t0) / (t1 - t0) * pw, Y = (y) => T + (1 - (y - lo) / (hi - lo)) * ph;
+  g.font = '11px "Malgun Gothic", sans-serif'; g.fillStyle = css('--text3'); g.strokeStyle = css('--grid'); g.lineWidth = 1;
+  const step = niceStep((hi - lo) / 4);
+  for (let y = Math.ceil(lo / step) * step; y <= hi; y += step) {
+    g.beginPath(); g.moveTo(L, Y(y)); g.lineTo(w - R, Y(y)); g.stroke();
+    g.textAlign = 'right'; g.fillText(fmt(y), L - 4, Y(y) + 4);
+  }
+  const ts = niceStep((t1 - t0) / 6);
+  g.textAlign = 'center';
+  for (let t = Math.ceil(t0 / ts) * ts; t <= t1; t += ts) g.fillText(t.toFixed(ts < 1 ? 1 : 0) + 's', X(t), h - 5);
+  for (const s of series) {
+    g.strokeStyle = s.color; g.lineWidth = s.w || 1.6; g.setLineDash(s.dash || []);
+    g.beginPath(); let first = true;
+    for (const r of rows) { const y = s.f(r); if (!Number.isFinite(y)) { first = true; continue; } const x = X(r.t); if (first) { g.moveTo(x, Y(y)); first = false; } else g.lineTo(x, Y(y)); }
+    g.stroke(); g.setLineDash([]);
+  }
+}
+function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(x || 1))); const n = x / p; return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * p; }
+function fmt(y) { const a = Math.abs(y); return a >= 100 ? y.toFixed(0) : a >= 10 ? y.toFixed(0) : a >= 1 ? y.toFixed(1) : y.toFixed(2); }
+
+function drawCompare(runs) {
+  $('cmp-wrap').style.display = '';
+  const end = runs[0].r.plan.end;
+  const col = (m) => css('--m-' + m);
+  const T0 = runs[0].r.plan.cfg.T0;
+  const mk = (key) => runs.map(({ m, r }) => ({ m, rows: r.sim.log, f: (x) => x[key] }));
+  const draw = (cv, key, refKey, lg, title) => {
+    const allRows = [];
+    // 여러 로그를 한 차트에: 시간축 같으므로 첫 로그 행에 다른 값 붙임
+    const base = runs[0].r.sim.log;
+    for (let i = 0; i < base.length; i++) {
+      const o = { t: base[i].t, ref: base[i][refKey] };
+      runs.forEach(({ m, r }) => { const x = r.sim.log[i]; o[m] = x && !x.broken ? x[key] : NaN; });
+      allRows.push(o);
+    }
+    const series = [{ f: (o) => o.ref, color: css('--ref'), dash: [5, 4], w: 1.2 }].concat(runs.map(({ m }) => ({ f: (o) => o[m], color: col(m) })));
+    drawChart(cv, allRows, 0, end, series, { min: T0 * 0.5, max: T0 * 1.5 });
+    lg.innerHTML = `<b style="color:var(--text)">${title}</b>` + runs.map(({ m }) => `<span><i style="background:${col(m)}"></i>${METHODS[m].no} ${METHODS[m].name}</span>`).join('');
+  };
+  draw($('ch-c1'), 'T1m', 'Tref1', $('lg-c1'), '권출 장력');
+  draw($('ch-c2'), 'T2m', 'Tref3', $('lg-c2'), '권취 장력');
+}
+
+// ── 장비 그림 ─────────────────────────────────────
+// 필름 경로: 권출 롤 위 → 장력 검출 롤(또는 댄서) → 메인 롤(아래로 180° 감김 + 닙 / 롤 프레스) → 검출 롤(또는 댄서) → 권취 롤 위
+// 부호 자리 고정: 0 에 아주 가까우면 0, 부호는 같은 폭 칸에
+function sgnParts(x, d) { const r = Math.abs(x) < 0.5 * Math.pow(10, -d) ? 0 : x; return [r < 0 ? '−' : r > 0 ? '+' : '±', Math.abs(r).toFixed(d)]; }
+function sgnHtml(x, d) { const [a, b] = sgnParts(x, d); return `<span style="display:inline-block;width:0.65em;text-align:center">${a}</span>${b}`; }
+// 캔버스: 앞 글자 + 부호(고정 칸) + 숫자 + 뒤 글자
+function sgnText(g, x, y, pre, val, d, post) {
+  const [a, b] = sgnParts(val, d), al = g.textAlign;
+  g.textAlign = 'left'; g.fillText(pre, x, y);
+  const w0 = g.measureText(pre).width, sw = g.measureText('+').width + 2;
+  g.textAlign = 'center'; g.fillText(a, x + w0 + sw / 2, y);
+  g.textAlign = 'left'; g.fillText(b + post, x + w0 + sw, y);
+  g.textAlign = al;
+}
+function shade(hex, k) { // k>0 밝게, k<0 어둡게
+  const n = parseInt(hex.slice(1), 16); let r = n >> 16, gg = (n >> 8) & 255, b = n & 255;
+  const f = (c) => Math.round(k > 0 ? c + (255 - c) * k : c * (1 + k));
+  return `rgb(${f(r)},${f(gg)},${f(b)})`;
+}
+function drawMachine() {
+  if (sim.cfg.preset && sim.cfg.preset !== 'basic') return drawLine();
+  const cv = $('machine'), { g, w, h } = fitCanvas(cv), s = sim.s, mat = sim.mat;
+  g.clearRect(0, 0, w, h);
+  const cy = 140, sc = 76 / 0.16;
+  const xU = w * 0.14, xM = w * 0.5, xW = w * 0.86, xL1 = w * 0.31, xL2 = w * 0.69;
+  const r1 = s.R1 * sc, r3 = s.R3 * sc, rc = sim.P.Rc * sc;
+  const cM = 128, rM = 26, rN = 12, yL = 46, rL = 9, rD = 11, dx = 30;
+  const dev = (Tm, Tr) => Math.abs(Tm - Tr) / Tr;
+  const colOf = (d) => d < 0.05 ? css('--ok') : d < 0.15 ? css('--warn') : css('--bad');
+  const c1 = s.broken ? css('--bad') : colOf(dev(s.T1m, s.Tref1));
+  const c2 = s.broken ? css('--bad') : colOf(dev(s.T2m, s.Tref3));
+  const line = (pts, col) => { g.strokeStyle = col; g.lineWidth = 3; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.stroke(); };
+  const small = (x, y, r, fill, ang) => {
+    g.fillStyle = fill; g.strokeStyle = css('--text3'); g.lineWidth = 1; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.strokeStyle = css('--panel'); g.lineWidth = 2;
+    for (let k = 0; k < 4; k++) { const a = ang + k * Math.PI / 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * r * 0.8, y + Math.sin(a) * r * 0.8); g.stroke(); }
+  };
+  const press = sim.press, dancer = sim.dancerOn;
+  const nipY = cM + rM + 1;
+  // 메인 롤 들어가고 나오는 점
+  const inP = press ? [xM - 6, nipY] : [xM - rM, cM], outP = press ? [xM + 6, nipY] : [xM + rM, cM];
+  // 장력 검출부: 검출 롤 1개 또는 댄서 (고정 롤 2개 + 아래 댄서 롤)
+  const zone = (x, xd, col, from, to, dir) => {
+    if (!dancer) {
+      line([from, [x, yL - rL]], col); line([[x + rL * dir, yL], to], col);
+      return;
+    }
+    const yD = yL + 52 + xd * 400;
+    const xa = x - dx, xb = x + dx;
+    line([from, [xa, yL - rL]], col);
+    line([[xa + rL, yL], [x - rD, yD]], col);
+    g.strokeStyle = col; g.lineWidth = 3; g.beginPath(); g.arc(x, yD, rD + 1.5, Math.PI, 0, true); g.stroke();
+    line([[x + rD, yD], [xb - rL, yL]], col);
+    line([[xb, yL - rL], to], col);
+  };
+  if (!s.broken) {
+    if (dancer) {
+      zone(xL1, s.xd1, c1, [xU, cy - r1], inP, 1);
+      zone(xL2, s.xd3, c2, outP, [xW, cy - r3], -1);
+    } else {
+      zone(xL1, 0, c1, [xU, cy - r1], inP, 1);
+      zone(xL2, 0, c2, outP, [xW, cy - r3], -1);
+    }
+    if (!press) { g.strokeStyle = s.slipping ? css('--bad') : css('--text2'); g.lineWidth = 3; g.beginPath(); g.arc(xM, cM, rM + 2, Math.PI, 0, true); g.stroke(); }
+  } else {
+    line([[xU, cy - r1], [xL1 - (dancer ? dx : 0), yL - rL], [xL1 + 10, yL + 60]], css('--bad'));
+    line([[xW, cy - r3], [xL2 + (dancer ? dx : 0), yL - rL], [xL2 - 10, yL + 60]], css('--bad'));
+  }
+  // 릴
+  const roll = (x, r, th, label) => {
+    // 입체 롤: 바닥 그림자 + 원통 음영 + 감긴 층 줄무늬 + 테두리 하이라이트
+    g.fillStyle = 'rgba(0,0,0,0.10)'; g.beginPath(); g.ellipse(x + 4, cy + r + 6, r * 0.9, 5, 0, 0, Math.PI * 2); g.fill();
+    const gr = g.createRadialGradient(x - r * 0.35, cy - r * 0.35, r * 0.1, x, cy, r);
+    gr.addColorStop(0, shade(mat.color, 0.35)); gr.addColorStop(0.7, mat.color); gr.addColorStop(1, shade(mat.color, -0.35));
+    g.fillStyle = gr; g.strokeStyle = shade(mat.color, -0.5); g.lineWidth = 1.2;
+    g.beginPath(); g.arc(x, cy, r, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.strokeStyle = shade(mat.color, -0.18); g.lineWidth = 0.8;
+    for (let rr = rc + 4; rr < r - 1; rr += 4) { g.beginPath(); g.arc(x, cy, rr, 0, Math.PI * 2); g.stroke(); }
+    g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = 2; g.beginPath(); g.arc(x, cy, r - 1.5, Math.PI * 1.05, Math.PI * 1.55); g.stroke();
+    g.fillStyle = css('--panel'); g.strokeStyle = css('--text3'); g.lineWidth = 1;
+    g.beginPath(); g.arc(x, cy, rc, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.strokeStyle = css('--text2'); g.lineWidth = 2;
+    for (let k = 0; k < 3; k++) { const a = th + k * 2 * Math.PI / 3; g.beginPath(); g.moveTo(x, cy); g.lineTo(x + Math.cos(a) * rc, cy + Math.sin(a) * rc); g.stroke(); }
+    g.fillStyle = css('--text'); g.font = 'bold 13px "Malgun Gothic", sans-serif'; g.textAlign = 'center'; g.fillText(label, x, h - 8);
+  };
+  roll(xU, r1, s.th1, sim.cfg.epc ? '권출 (서보 + EPC)' : '권출 (서보)');
+  roll(xW, r3, s.th3, '권취 (서보)');
+  // 메인 롤
+  const ang = s.len / (rM / sc);
+  if (press) {
+    small(xM, cM, rM, css('--text3'), ang);
+    small(xM, cM + 2 * rM + 3, rM, css('--ref'), -ang);
+    g.fillStyle = css('--text'); g.font = 'bold 13px "Malgun Gothic", sans-serif'; g.textAlign = 'center';
+    g.fillText('롤 프레스 (상·하 서보 2대)', xM, h - 8);
+    g.font = '12px "Malgun Gothic", sans-serif'; g.fillStyle = css('--text2');
+    g.fillText(`상 ${s.tauU.toFixed(1)} · 하 ${s.tauL.toFixed(1)} N·m`, xM + rM + 70, cM + rM + 6);
+  } else {
+    small(xM, cM, rM, css('--text3'), ang);
+    small(xM, cM + rM + 4 + rN, rN, css('--ref'), -s.len / (rN / sc));
+    g.fillStyle = css('--text'); g.font = 'bold 13px "Malgun Gothic", sans-serif'; g.textAlign = 'center';
+    g.fillText('메인 롤 (서보, 라인 속도 기준)', xM, h - 8);
+    g.font = '11.5px "Malgun Gothic", sans-serif'; g.fillStyle = s.slipping ? css('--bad') : css('--text3');
+    g.fillText(s.slipping ? '⚠ 미끄럼! 잡는 힘 부족' : `필름 ${sim.cfg.wrapDeg}° 감김 + 닙 ${sim.cfg.nip}N`, xM, cM + rM + rN * 2 + 22);
+  }
+  // 장력 검출 롤 또는 댄서
+  const lc = (x, xd, T, Tr, col) => {
+    g.textAlign = 'center'; g.font = '12px "Malgun Gothic", sans-serif';
+    g.fillStyle = col; g.fillText(`장력 ${T.toFixed(1)} N`, x, 16);
+    if (!dancer) {
+      small(x, yL, rL, css('--panel'), s.len / (rL / sc));
+      g.fillStyle = css('--text3'); g.fillRect(x - 3, yL + rL, 6, 10); g.fillRect(x - 12, yL + rL + 10, 24, 5);
+      g.fillText(`목표 ${Tr.toFixed(1)} · 검출 롤`, x, yL + rL + 30);
+    } else {
+      const yD = yL + 52 + xd * 400;
+      small(x - dx, yL, rL, css('--panel'), s.len / (rL / sc));
+      small(x + dx, yL, rL, css('--panel'), s.len / (rL / sc));
+      // 실린더(위에서 아래로 누름)
+      g.fillStyle = css('--text3'); g.fillRect(x - 6, yL - 2, 12, 22); g.fillRect(x - 1.5, yL + 20, 3, yD - yL - 20 - rD);
+      small(x, yD, rD, css('--panel'), s.len / (rD / sc));
+      g.fillStyle = css('--text3'); g.fillText(`목표 ${Tr.toFixed(1)} · 댄서 ${sgnParts(xd * 1000, 1).join('')}mm`, x, yD + rD + 16);
+    }
+  };
+  lc(xL1, s.xd1, s.T1m, s.Tref1, c1);
+  lc(xL2, s.xd3, s.T2m, s.Tref3, c2);
+  // EPC 표시
+  const ey = Math.abs(s.ym);
+  g.textAlign = 'left'; g.font = '12px "Malgun Gothic", sans-serif';
+  g.fillStyle = ey < 0.5 ? css('--ok') : ey < 1.5 ? css('--warn') : css('--bad');
+  sgnText(g, 8, 16, '사행 ', s.ym, 2, ' mm');
+  g.fillStyle = css('--text3');
+  if (sim.cfg.epc) sgnText(g, 8, 32, 'EPC 스탠드 ', s.u, 2, ' mm'); else g.fillText('EPC 꺼짐', 8, 32);
+  const rpm = (wv) => Math.abs(wv) < 0.05 ? '0' : (wv * 60 / (2 * Math.PI)).toFixed(0);
+  g.textAlign = 'center'; g.fillStyle = css('--text2'); g.font = '12px "Malgun Gothic", sans-serif';
+  g.fillText(`Ø${(s.R1 * 2000).toFixed(0)}mm · ${rpm(s.w1)} rpm`, xU, h - 26);
+  g.fillText(`Ø${(s.R3 * 2000).toFixed(0)}mm · ${rpm(s.w3)} rpm`, xW, h - 26);
+}
+
+// ── 3차: 여러 롤 라인 그림 · 구간 표 · 역할 비교 ─────────────
+const ZCOL = ['#2f6fde', '#e0452f', '#119c8c', '#e07b1a', '#8e44ad', '#b07d12'];
+let zoneT = null, roles = null;          // 구간 목표 장력(N) · 중간 롤 역할 덮어쓰기
+function presetKey() { return $('c-preset').value; }
+function resetZoneOverrides() { zoneT = null; roles = null; }
+
+function buildZoneTable() {
+  const ln = sim.line, tb = $('zone-body');
+  const nm = (i) => ln.els[i].name;
+  tb.innerHTML = ln.zones.map((zn, z) => {
+    const e = ln.els[zn.ctrl];
+    let role;
+    if (e.k === 'drive') {
+      role = `<select data-role="${zn.ctrl}"><option value="tension"${e.role === 'tension' ? ' selected' : ''}>장력 루프 (로드셀 → 속도 보정)</option><option value="draw"${e.role === 'draw' ? ' selected' : ''}>드로우만 (속도 비율)</option></select>`;
+    } else role = `<span style="color:var(--text2)">${METHODS[sim.cfg.method].no} ${METHODS[sim.cfg.method].name}</span>`;
+    return `<tr><td><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${ZCOL[z % 6]};margin-right:6px"></i>${zn.name}</td>
+      <td>${nm(zn.a)} → ${nm(zn.b)}</td><td>${nm(zn.ctrl)}</td><td>${role}</td>
+      <td><input data-zt="${z}" type="number" step="1" value="${(sim.s.Tref[z]).toFixed(0)}" style="width:70px;text-align:right"></td>
+      <td id="zt-act-${z}">-</td><td id="zt-err-${z}">-</td></tr>`;
+  }).join('');
+  tb.querySelectorAll('[data-role]').forEach((el) => el.addEventListener('change', () => {
+    roles = roles || {}; roles[el.dataset.role] = el.value; reset();
+  }));
+  tb.querySelectorAll('[data-zt]').forEach((el) => el.addEventListener('change', () => {
+    zoneT = sim.line.zones.map((_, z) => +tb.querySelector(`[data-zt="${z}"]`).value); reset();
+  }));
+  $('b-roles').disabled = !sim.line.els.some((e, i) => e.k === 'drive' && i !== sim.line.mi);
+}
+function updateZoneTable() {
+  const s = sim.s;
+  sim.line.zones.forEach((_, z) => {
+    const a = $('zt-act-' + z), e = $('zt-err-' + z); if (!a) return;
+    const d = s.Tm[z] - s.Tref[z], pct = Math.abs(d) / s.Tref[z];
+    a.textContent = s.Tm[z].toFixed(1) + ' N';
+    e.innerHTML = sgnHtml(d, 2) + ' N';
+    e.style.color = pct < 0.05 ? 'var(--ok)' : pct < 0.15 ? 'var(--warn)' : 'var(--bad)';
+  });
+}
+function filterScenarios() {
+  const pk = presetKey(), multi = pk !== 'basic', sel = $('c-scen'), cur = sel.value;
+  sel.innerHTML = '';
+  for (const [k, m] of Object.entries(SCENARIOS)) {
+    if (m.only && !m.only.includes(pk)) continue;
+    if (m.multi && !multi) continue;
+    sel.add(new Option(m.name, k));
+  }
+  if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
+  $('c-main').disabled = multi;
+}
+
+// 중간 롤 역할 비교: 모두 장력 루프 vs 모두 드로우
+function compareRoles() {
+  const key = $('c-scen').value, base = cfgFull();
+  const ln = sim.line, mids = ln.els.map((e, i) => (e.k === 'drive' && i !== ln.mi && e.type !== 'press' ? i : -1)).filter((i) => i >= 0);
+  const mk = (role) => { const r = {}; mids.forEach((i) => { r[i] = role; }); return r; };
+  const runs = [
+    { label: '중간 롤 = 장력 루프', color: css('--m-full'), r: runScenario(key, { ...base, roles: mk('tension') }) },
+    { label: '중간 롤 = 드로우만', color: css('--m-dancer'), r: runScenario(key, { ...base, roles: mk('draw') }) }
+  ];
+  runs.forEach(({ label, r }) => addRow(r.plan.cfg, key, r.plan.cfg.method, r.m, r.sim.s.alarms, label));
+  // 차트: 두 번째·세 번째 구간 장력 (중간 롤이 맡는 구간)
+  const zs = ln.zones.map((zn, z) => (ln.els[zn.ctrl].k === 'drive' ? z : -1)).filter((z) => z >= 0).slice(0, 2);
+  drawCompareGeneric(runs, zs.map((z) => ({ title: ln.zones[z].name + ' 장력', f: (x) => x.Tz[z], ref: (x) => x.Trz[z] })));
+}
+function drawCompareGeneric(runs, panels) {
+  $('cmp-wrap').style.display = '';
+  const cvs = [$('ch-c1'), $('ch-c2')], lgs = [$('lg-c1'), $('lg-c2')];
+  panels.forEach((pn, k) => {
+    const base = runs[0].r.sim.log, rows = [];
+    for (let i = 0; i < base.length; i++) {
+      const o = { t: base[i].t, ref: pn.ref(base[i]) };
+      runs.forEach((rn, j) => { const x = rn.r.sim.log[i]; o['r' + j] = x && !x.broken ? pn.f(x) : NaN; });
+      rows.push(o);
+    }
+    const T0 = pn.ref(base[0]);
+    drawChart(cvs[k], rows, 0, runs[0].r.plan.end,
+      [{ f: (o) => o.ref, color: css('--ref'), dash: [5, 4], w: 1.2 }].concat(runs.map((rn, j) => ({ f: (o) => o['r' + j], color: rn.color }))),
+      { min: T0 * 0.5, max: T0 * 1.5 });
+    lgs[k].innerHTML = `<b style="color:var(--text)">${pn.title}</b>` + runs.map((rn) => `<span><i style="background:${rn.color}"></i>${rn.label}</span>`).join('');
+  });
+  if (panels.length < 2) { cvs[1].getContext('2d').clearRect(0, 0, cvs[1].width, cvs[1].height); lgs[1].innerHTML = ''; }
+}
+
+// 여러 롤 라인 그림
+function drawLine() {
+  const cv = $('machine'), { g, w, h } = fitCanvas(cv), s = sim.s, mat = sim.mat, ln = sim.line, els = ln.els, n = els.length;
+  g.clearRect(0, 0, w, h);
+  const cy = 150, sc = 62 / 0.16, yD = 158, yI = 78, rc = sim.P.Rc * sc;
+  // 간격: 아이들 롤끼리는 좁게, 구동 롤·릴 사이는 넓게
+  const gw = []; for (let i = 0; i < n - 1; i++) gw.push(els[i].k === 'idler' && els[i + 1].k === 'idler' ? 1 : 2.4);
+  const gsum = gw.reduce((a, b) => a + b, 0); let acc = 0;
+  const xs = els.map((e, i) => { const x = w * 0.075 + w * 0.85 * acc / gsum; if (i < n - 1) acc += gw[i]; return x; });
+  const rOf = (e) => e.type === 'press' ? 20 : e.type === 'backup' ? 22 : 15;
+  // 건조로 상자
+  const idl = els.map((e, i) => (e.k === 'idler' ? i : -1)).filter((i) => i >= 0);
+  if (idl.length) {
+    const x0 = xs[idl[0]] - 22, x1 = xs[idl[idl.length - 1]] + 22;
+    g.fillStyle = 'rgba(224,123,26,0.08)'; g.strokeStyle = 'rgba(224,123,26,0.45)'; g.lineWidth = 1; g.setLineDash([4, 3]);
+    g.fillRect(x0, yI - 34, x1 - x0, 62); g.strokeRect(x0, yI - 34, x1 - x0, 62); g.setLineDash([]);
+    g.fillStyle = css('--wnd'); g.font = '12px "Malgun Gothic", sans-serif'; g.textAlign = 'center'; g.fillText('건조로 (아이들 롤)', (x0 + x1) / 2, yI + 42);
+  }
+  // 필름 경로 점
+  const r1 = s.R1 * sc, r3 = s.R3 * sc;
+  const pin = [], pout = [];
+  els.forEach((e, i) => {
+    const x = xs[i];
+    if (e.k === 'unw') { pin[i] = pout[i] = [x, cy - r1]; }
+    else if (e.k === 'wnd') { pin[i] = pout[i] = [x, cy - r3]; }
+    else if (e.k === 'idler') { pin[i] = pout[i] = [x, yI - 7]; }
+    else if (e.type === 'press') { const r = rOf(e); pin[i] = [x - 3, yD + r + 1]; pout[i] = [x + 3, yD + r + 1]; }
+    else { const r = rOf(e); pin[i] = [x - r - 2, yD]; pout[i] = [x + r + 2, yD]; }
+  });
+  const colOf = (d) => d < 0.05 ? css('--ok') : d < 0.15 ? css('--warn') : css('--bad');
+  for (let j = 0; j < n - 1; j++) {
+    const z = ln.zoneOfSpan[j], T = s.Tt[j], Tr = s.Tref[z];
+    g.strokeStyle = s.broken ? css('--bad') : colOf(Math.abs(T - Tr) / Tr); g.lineWidth = 3;
+    g.beginPath(); g.moveTo(pout[j][0], pout[j][1]);
+    if (!s.broken && T < 1) { const [ax, ay] = pout[j], [bx, by] = pin[j + 1]; g.quadraticCurveTo((ax + bx) / 2, Math.max(ay, by) + 30, bx, by); }
+    else if (s.broken && j === 0) { g.lineTo(pout[j][0] + 30, pout[j][1] + 50); }
+    else if (s.broken) { g.moveTo(pin[j + 1][0], pin[j + 1][1]); }
+    else g.lineTo(pin[j + 1][0], pin[j + 1][1]);
+    g.stroke();
+  }
+  // 롤
+  const small = (x, y, r, fill, ang) => {
+    g.fillStyle = fill; g.strokeStyle = css('--text3'); g.lineWidth = 1; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.strokeStyle = css('--panel'); g.lineWidth = 2;
+    for (let k = 0; k < 4; k++) { const a = ang + k * Math.PI / 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * r * 0.8, y + Math.sin(a) * r * 0.8); g.stroke(); }
+  };
+  const reel = (x, r, th) => {
+    g.fillStyle = 'rgba(0,0,0,0.10)'; g.beginPath(); g.ellipse(x + 4, cy + r + 6, r * 0.9, 5, 0, 0, Math.PI * 2); g.fill();
+    const gr = g.createRadialGradient(x - r * 0.35, cy - r * 0.35, r * 0.1, x, cy, r);
+    gr.addColorStop(0, shade(mat.color, 0.35)); gr.addColorStop(0.7, mat.color); gr.addColorStop(1, shade(mat.color, -0.35));
+    g.fillStyle = gr; g.strokeStyle = shade(mat.color, -0.5); g.lineWidth = 1.2; g.beginPath(); g.arc(x, cy, r, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.strokeStyle = shade(mat.color, -0.18); g.lineWidth = 0.8;
+    for (let rr = rc + 4; rr < r - 1; rr += 4) { g.beginPath(); g.arc(x, cy, rr, 0, Math.PI * 2); g.stroke(); }
+    g.fillStyle = css('--panel'); g.strokeStyle = css('--text3'); g.lineWidth = 1; g.beginPath(); g.arc(x, cy, rc, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.strokeStyle = css('--text2'); g.lineWidth = 2;
+    for (let k = 0; k < 3; k++) { const a = th + k * 2 * Math.PI / 3; g.beginPath(); g.moveTo(x, cy); g.lineTo(x + Math.cos(a) * rc, cy + Math.sin(a) * rc); g.stroke(); }
+  };
+  g.textAlign = 'center';
+  els.forEach((e, i) => {
+    const x = xs[i];
+    if (e.k === 'unw') reel(x, r1, s.th1);
+    else if (e.k === 'wnd') reel(x, r3, s.th3);
+    else if (e.k === 'idler') small(x, yI, 7, css('--panel'), s.len / 0.04);
+    else {
+      const r = rOf(e), st = s.E[i];
+      if (e.type === 'press') { small(x, yD, r, css('--text3'), s.len / 0.2); small(x, yD + 2 * r + 2, r, css('--ref'), -s.len / 0.2); }
+      else {
+        g.strokeStyle = st.slipping ? css('--bad') : css('--text2'); g.lineWidth = 3; g.beginPath(); g.arc(x, yD, r + 2, Math.PI, 0, true); g.stroke();
+        small(x, yD, r, css('--text3'), s.len / (r / sc));
+        if (e.type === 'nip') small(x, yD + r + 4 + 8, 8, css('--ref'), -s.len / 0.02);
+      }
+      g.font = 'bold 11.5px "Malgun Gothic", sans-serif'; g.fillStyle = st.slipping ? css('--bad') : css('--text');
+      g.fillText(e.name + (st.slipping ? ' ⚠미끄럼' : ''), x, h - 26);
+      g.font = '11px "Malgun Gothic", sans-serif'; g.fillStyle = css('--text3');
+      g.fillText(e.role === 'master' ? '속도 기준' : e.role === 'draw' ? '드로우' : '장력 루프', x, h - 10);
+    }
+  });
+  const rpm = (wv) => Math.abs(wv) < 0.05 ? '0' : (wv * 60 / (2 * Math.PI)).toFixed(0);
+  g.font = 'bold 12px "Malgun Gothic", sans-serif'; g.fillStyle = css('--text');
+  g.fillText('권출', xs[0], h - 26); g.fillText('권취', xs[n - 1], h - 26);
+  g.font = '11px "Malgun Gothic", sans-serif'; g.fillStyle = css('--text2');
+  g.fillText(`Ø${(s.R1 * 2000).toFixed(0)} · ${rpm(s.w1)}rpm`, xs[0], h - 10);
+  g.fillText(`Ø${(s.R3 * 2000).toFixed(0)} · ${rpm(s.w3)}rpm`, xs[n - 1], h - 10);
+  // 구간 표시 (위쪽 띠) + 장력계 위치
+  ln.zones.forEach((zn, z) => {
+    const xa = xs[zn.a], xb = xs[zn.b], col = ZCOL[z % 6];
+    g.fillStyle = col; g.globalAlpha = 0.85; g.fillRect(xa + 4, 4, xb - xa - 8, 4); g.globalAlpha = 1;
+    const d = Math.abs(s.Tm[z] - s.Tref[z]) / s.Tref[z];
+    g.font = '12px "Malgun Gothic", sans-serif'; g.fillStyle = s.broken ? css('--bad') : colOf(d);
+    g.fillText(`${zn.name.replace(' 구간', '')} ${s.Tm[z].toFixed(1)}/${s.Tref[z].toFixed(0)}N`, (xa + xb) / 2, 24);
+    const j = zn.sensor, mx = (pout[j][0] + pin[j + 1][0]) / 2, my = (pout[j][1] + pin[j + 1][1]) / 2;
+    g.fillStyle = col; g.beginPath(); g.moveTo(mx, my + 5); g.lineTo(mx - 6, my + 15); g.lineTo(mx + 6, my + 15); g.closePath(); g.fill();
+    g.font = '10px "Malgun Gothic", sans-serif'; g.fillText(sim.dancerOn && (z === 0 || z === ln.zones.length - 1) ? '댄서' : '로드셀', mx, my + 27);
+  });
+  // EPC
+  const ey = Math.abs(s.ym);
+  g.textAlign = 'left'; g.font = '12px "Malgun Gothic", sans-serif';
+  g.fillStyle = ey < 0.5 ? css('--ok') : ey < 1.5 ? css('--warn') : css('--bad');
+  sgnText(g, 6, 44, '사행 ', s.ym, 2, ' mm');
+  g.fillStyle = css('--text3'); if (sim.cfg.epc) sgnText(g, 6, 60, 'EPC ', s.u, 2, ' mm'); else g.fillText('EPC 꺼짐', 6, 60);
+}
+
+// ── 화면 갱신 ─────────────────────────────────────
+let alarmCount = -1;
+function renderAlarms() {
+  const a = sim.s.alarms; if (a.length === alarmCount) return; alarmCount = a.length;
+  $('alarms').innerHTML = a.map((x) => `<li>${x.t.toFixed(2)}s ${x.msg}</li>`).join('');
+}
+function renderStats() {
+  const s = sim.s;
+  $('s-v').innerHTML = `${(s.vcmd * 60).toFixed(1)} <small>m/min</small>`;
+  $('s-T1').innerHTML = `${s.T1m.toFixed(1)} <small>/ ${s.Tref1.toFixed(1)} N</small>`;
+  $('s-T2').innerHTML = `${s.T2m.toFixed(1)} <small>/ ${s.Tref3.toFixed(1)} N</small>`;
+  $('s-len').innerHTML = `${s.len.toFixed(1)} <small>m</small>`;
+  $('s-D1').innerHTML = `${(s.R1 * 2000).toFixed(1)} <small>/ ${(s.R1e * 2000).toFixed(1)} mm</small>`;
+  $('s-D3').innerHTML = `${(s.R3 * 2000).toFixed(1)} <small>/ ${(s.R3e * 2000).toFixed(1)} mm</small>`;
+  const md = (m) => m === 'spd' ? '속도' : '토크';
+  $('s-q1').innerHTML = `${s.tau1.toFixed(2)} <small>N·m (${md(s.mode1)})</small>`;
+  $('s-q3').innerHTML = `${s.tau3.toFixed(2)} <small>N·m (${md(s.mode3)})</small>`;
+  $('s-epc').innerHTML = `${sgnHtml(s.ym, 2)} <small>/ ${sim.cfg.epc ? sgnHtml(s.u, 2) + ' mm' : 'EPC 꺼짐'}</small>`;
+  $('s-dan').innerHTML = sim.dancerOn ? `${sgnHtml(s.xd1 * 1000, 1)} <small>/ ${sgnHtml(s.xd3 * 1000, 1)} mm</small>` : '<small>댄서 없음</small>';
+  $('s-slip').innerHTML = sim.press ? '<small>롤 프레스 (미끄럼 없음)</small>'
+    : `<span style="color:${s.slipping ? 'var(--bad)' : 'inherit'}">${s.slipMargin.toFixed(1)}</span> <small>N${s.slipping ? ' 미끄럼!' : ''}</small>`;
+  $('s-press').innerHTML = sim.press ? `${s.tauU.toFixed(1)} <small>/ ${s.tauL.toFixed(1)} N·m</small>` : '<small>닙 롤 방식</small>';
+  const st = $('st-state');
+  if (s.fault || s.broken) { st.textContent = '알람'; st.className = 'state alarm'; }
+  else if (s.vcmd > 0.001) { st.textContent = scen ? `시나리오 운전 중` : '운전 중'; st.className = 'state run'; }
+  else { st.textContent = '정지'; st.className = 'state'; }
+}
+function renderCharts() {
+  const log = sim.log, t1 = Math.max(20, sim.s.t), t0 = t1 - 20;
+  let i = log.length - 1; while (i > 0 && log[i].t > t0) i--;
+  const rows = log.slice(i);
+  if (log.length > 9000) log.splice(0, log.length - 6000);
+  const T0 = sim.cfg.T0;
+  const Zn = sim.line.zones.length;
+  if (Zn > 2) {
+    const ser = [];
+    let lo = 1e9, hi = 0;
+    for (let z = 0; z < Zn; z++) {
+      ser.push({ f: (r) => r.Trz[z], color: ZCOL[z % 6], dash: [5, 4], w: 1 });
+      ser.push({ f: (r) => r.Tz[z], color: ZCOL[z % 6] });
+      lo = Math.min(lo, sim.s.Tref[z]); hi = Math.max(hi, sim.s.Tref[z]);
+    }
+    drawChart($('ch-T'), rows, t0, t1, ser, { min: lo * 0.8, max: hi * 1.2 });
+    $('lg-T').innerHTML = sim.line.zones.map((zn, z) => `<span><i style="background:${ZCOL[z % 6]}"></i>${zn.name}</span>`).join('') + '<span>점선 = 목표</span>';
+  } else {
+    drawChart($('ch-T'), rows, t0, t1, [
+      { f: (r) => r.Tref1, color: css('--ref'), dash: [5, 4], w: 1.2 },
+      { f: (r) => r.Tref3, color: css('--ref'), dash: [2, 3], w: 1.2 },
+      { f: (r) => r.T1m, color: css('--unw') }, { f: (r) => r.T2m, color: css('--wnd') }], { min: T0 * 0.8, max: T0 * 1.2 });
+    $('lg-T').innerHTML = '<span><i style="background:var(--unw)"></i>권출 스팬</span><span><i style="background:var(--wnd)"></i>권취 스팬</span><span><i style="background:var(--ref)"></i>목표</span>';
+  }
+  drawChart($('ch-V'), rows, t0, t1, [
+    { f: (r) => r.vcmd * 60, color: css('--ref'), dash: [5, 4], w: 1.2 },
+    { f: (r) => r.v1 * 60, color: css('--unw') }, { f: (r) => r.v3 * 60, color: css('--wnd') }], { min: 0, minSpan: 5 });
+  drawChart($('ch-D'), rows, t0, t1, [
+    { f: (r) => r.R1 * 2000, color: css('--unw') }, { f: (r) => r.R3 * 2000, color: css('--wnd') },
+    { f: (r) => r.R1e * 2000, color: css('--est'), dash: [4, 3] }, { f: (r) => r.R3e * 2000, color: css('--est'), dash: [4, 3] }], { minSpan: 10 });
+  drawChart($('ch-Q'), rows, t0, t1, [
+    { f: (r) => r.tau1, color: css('--unw') }, { f: (r) => r.tau3, color: css('--wnd') }], { min: 0, minSpan: 2 });
+  drawChart($('ch-E'), rows, t0, t1, [
+    { f: () => 0, color: css('--ref'), dash: [5, 4], w: 1.2 },
+    { f: (r) => r.u, color: css('--epc') }, { f: (r) => r.y, color: css('--bad') }], { min: -1, max: 1 });
+  $('card-dn').style.display = sim.dancerOn ? '' : 'none';
+  $('card-s').style.display = sim.press ? 'none' : '';
+  $('card-p').style.display = sim.press ? '' : 'none';
+  if (sim.dancerOn) drawChart($('ch-Dn'), rows, t0, t1, [
+    { f: () => 0, color: css('--ref'), dash: [5, 4], w: 1.2 },
+    { f: (r) => r.xd1 * 1000, color: css('--unw') }, { f: (r) => r.xd3 * 1000, color: css('--wnd') }], { min: -2, max: 2 });
+  if (!sim.press) drawChart($('ch-S'), rows, t0, t1, [
+    { f: () => 0, color: css('--bad'), dash: [5, 4], w: 1.2 },
+    { f: (r) => r.margin, color: css('--ok') }], { min: 0 });
+  else drawChart($('ch-P'), rows, t0, t1, [
+    { f: (r) => r.tauU, color: css('--unw') }, { f: (r) => r.tauL, color: css('--wnd') }], { min: 0, minSpan: 5 });
+}
+
+let last = performance.now(), lastNum = 0;
+function frame(ts) {
+  const real = Math.min(0.05, (ts - last) / 1000); last = ts;
+  const span = real * +$('c-speed').value;
+  // 시나리오 이벤트는 정확한 시각에
+  let remain = span;
+  while (remain > 1e-9) {
+    let stepT = Math.min(remain, 0.01);
+    if (scen) {
+      const evs = scen.plan.events;
+      while (scen.i < evs.length && evs[scen.i].t <= sim.s.t) { act(sim, evs[scen.i].a); scen.i++; }
+    }
+    sim.advance(stepT); remain -= stepT;
+    if (scen && sim.s.t >= scen.plan.end) {
+      addRow(scen.plan.cfg, scen.key, scen.plan.cfg.method, metrics(sim.log, scen.plan.cfg), sim.s.alarms);
+      scen = null;
+      break;
+    }
+  }
+  drawMachine(); renderCharts(); renderAlarms();
+  if (ts - lastNum > 200) { lastNum = ts; renderStats(); updateZoneTable(); }
+  requestAnimationFrame(frame);
+}
+
+// 시작
+$('c-T0').value = MATERIALS[$('c-mat').value].T0;
+recommendAll(); showGains(); filterScenarios(); reset();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
